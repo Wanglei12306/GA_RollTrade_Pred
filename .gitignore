@@ -1,0 +1,17 @@
+# Word temporary files
+~$*.docx
+
+# Java build outputs
+target/
+build/
+out/
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
