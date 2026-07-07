@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GA RollTrade · 参数配置</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">GA</div>
+      <div><h1>RollTrade</h1><p>遗传滚动择时</p></div>
+    </div>
+    <nav class="nav-list">
+      <a class="nav-item" th:href="@{/}"><span class="nav-icon">⌁</span><span>首页</span></a>
+      <a class="nav-item" th:href="@{/data}"><span class="nav-icon">▤</span><span>数据管理</span></a>
+      <a class="nav-item active" th:href="@{/config}"><span class="nav-icon">◇</span><span>参数配置</span></a>
+      <a class="nav-item" th:href="@{/result}"><span class="nav-icon">↗</span><span>回测结果</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2>参数配置</h2>
+        <p>配置技术指标池、遗传算法参数与滚动窗口</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="secondary-button" th:href="@{/data}">上一步</a>
+      </div>
+    </header>
+
+    <div class="alert alert-error" th:if="${error}" th:text="${error}">错误提示</div>
+    <div class="alert alert-error" th:if="${!hasData}">
+      尚未导入行情数据，请先前往 <a th:href="@{/data}">数据管理</a> 上传或加载示例数据。
+    </div>
+
+    <form th:action="@{/run}" method="post">
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">指标池</span><h3>技术指标选择</h3></div></div>
+        <div class="panel-body">
+          <div class="chip-grid">
+            <label class="check-chip" th:each="ind : ${indicators}">
+              <input type="checkbox" name="indicators" th:value="${ind}" checked>
+              <span th:text="${ind}">指标</span>
+            </label>
+          </div>
+          <p class="hint">勾选参与遗传算法优化的指标（建议至少 2 个）。</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">遗传算法</span><h3>GA 参数</h3></div></div>
+        <div class="form-grid">
+          <div><label>种群规模</label><input type="number" name="populationSize" th:value="${config.populationSize}" min="20" max="500"></div>
+          <div><label>迭代次数</label><input type="number" name="generations" th:value="${config.generations}" min="10" max="1000"></div>
+          <div><label>交叉概率 (0~1)</label><input type="number" step="0.01" name="crossoverRate" th:value="${config.crossoverRate}" min="0" max="1"></div>
+          <div><label>变异概率 (0~1)</label><input type="number" step="0.01" name="mutationRate" th:value="${config.mutationRate}" min="0" max="1"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">滚动窗口</span><h3>训练 / 预测 / 步长（月）</h3></div></div>
+        <div class="form-grid">
+          <div><label>训练窗口（月）</label><input type="number" name="trainMonths" th:value="${config.trainMonths}" min="1" max="12"></div>
+          <div><label>预测窗口（月）</label><input type="number" name="predictMonths" th:value="${config.predictMonths}" min="1" max="6"></div>
+          <div><label>滚动步长（月）</label><input type="number" name="stepMonths" th:value="${config.stepMonths}" min="1" max="6"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">回测</span><h3>资金与手续费</h3></div></div>
+        <div class="form-grid">
+          <div><label>初始资金</label><input type="number" name="initialCapital" th:value="${config.initialCapital}" min="1000"></div>
+          <div><label>手续费率</label><input type="number" step="0.0001" name="commissionRate" th:value="${config.commissionRate}" min="0" max="0.01"></div>
+        </div>
+      </section>
+
+      <div style="text-align:right;padding:0 4px 24px">
+        <button type="submit" class="primary-button" style="min-height:44px;padding:0 28px" th:disabled="${!hasData}">开始回测</button>
+      </div>
+    </form>
+  </main>
+</div>
+</body>
+</html>
