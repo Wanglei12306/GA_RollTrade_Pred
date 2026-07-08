@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GA RollTrade · 首页</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">GA</div>
+      <div><h1>RollTrade</h1><p>遗传滚动择时</p></div>
+    </div>
+    <nav class="nav-list">
+      <a class="nav-item active" th:href="@{/}"><span class="nav-icon">⌁</span><span>首页</span></a>
+      <a class="nav-item" th:href="@{/data}"><span class="nav-icon">▤</span><span>数据管理</span></a>
+      <a class="nav-item" th:href="@{/config}"><span class="nav-icon">◇</span><span>参数配置</span></a>
+      <a class="nav-item" th:href="@{/result}"><span class="nav-icon">↗</span><span>回测结果</span></a>
+    </nav>
+    <div class="sidebar-block">
+      <span class="eyebrow">系统状态</span>
+      <strong th:text="${hasData} ? '数据已导入' : '未导入数据'">数据状态</strong>
+      <small th:text="${hasResult} ? '已有回测结果' : '尚未运行回测'">结果状态</small>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2>基于遗传算法的量化策略分析系统</h2>
+        <p>多技术指标池 · 遗传算法寻优 · 滚动窗口预测 · 标准化回测</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="secondary-button" th:href="@{/data}">开始使用</a>
+        <a class="primary-button" th:href="@{/config}">配置并回测</a>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-head"><div><span class="eyebrow">系统简介</span><h3>项目概述</h3></div></div>
+      <div class="panel-body">
+        <p style="line-height:1.8;color:var(--muted)">
+          本系统面向股票与期货量化交易场景，构建覆盖趋势、震荡、波动率、成交量、乖离率等维度的
+          <strong>8 类技术指标池</strong>（MA、MACD、RSI、BOLL、KDJ、ATR、OBV、CCI），
+          通过<strong>遗传算法</strong>自动完成指标筛选、参数寻优、权重分配与交易阈值优化；
+          采用<strong>滚动窗口</strong>（3 月训练 / 1 月预测 / 1 月步长）训练与外推预测，
+          严格时序隔离以避免未来函数与过拟合；最终输出标准化回测绩效，并与固定参数策略对比，
+          验证动态寻优的有效性。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><span class="eyebrow">运行流程</span><h3>四步完成策略分析</h3></div></div>
+      <div class="flow-steps">
+        <div class="flow-step"><div class="num">1</div><h4>数据导入</h4><p>上传 CSV 历史行情或加载示例数据，系统校验并预览</p></div>
+        <div class="flow-step"><div class="num">2</div><h4>指标配置</h4><p>选择技术指标，设置遗传算法与滚动窗口参数</p></div>
+        <div class="flow-step"><div class="num">3</div><h4>遗传寻优</h4><p>滚动训练窗口运行遗传算法，外推预测买卖时机</p></div>
+        <div class="flow-step"><div class="num">4</div><h4>回测展示</h4><p>执行标准化回测，展示绩效、资金曲线与策略对比</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

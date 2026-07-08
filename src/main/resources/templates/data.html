@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GA RollTrade · 数据管理</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">GA</div>
+      <div><h1>RollTrade</h1><p>遗传滚动择时</p></div>
+    </div>
+    <nav class="nav-list">
+      <a class="nav-item" th:href="@{/}"><span class="nav-icon">⌁</span><span>首页</span></a>
+      <a class="nav-item active" th:href="@{/data}"><span class="nav-icon">▤</span><span>数据管理</span></a>
+      <a class="nav-item" th:href="@{/config}"><span class="nav-icon">◇</span><span>参数配置</span></a>
+      <a class="nav-item" th:href="@{/result}"><span class="nav-icon">↗</span><span>回测结果</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2>数据管理</h2>
+        <p>上传 CSV 历史行情数据，或加载内置示例数据</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="secondary-button" th:href="@{/config}">下一步：参数配置</a>
+      </div>
+    </header>
+
+    <div id="alertBox"></div>
+
+    <section class="panel">
+      <div class="panel-head"><div><span class="eyebrow">数据导入</span><h3>上传行情数据</h3></div></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <input type="file" id="fileInput" accept=".csv" style="flex:1;min-width:220px">
+          <button class="primary-button" id="uploadBtn">上传 CSV</button>
+          <button class="secondary-button" id="sampleBtn">加载示例数据</button>
+        </div>
+        <p class="hint">CSV 字段需包含：date, open, high, low, close, volume（字段名支持中英文别名，时间支持多种格式）</p>
+      </div>
+    </section>
+
+    <section class="panel" id="previewPanel" style="display:none">
+      <div class="panel-head"><div><span class="eyebrow">数据预览</span><h3 id="previewTitle">行情数据</h3></div></div>
+      <div class="metric-grid" id="summaryGrid"></div>
+      <div class="chart-frame medium"><div id="priceChart" style="width:100%;height:100%"></div></div>
+      <div class="table-wrap" style="padding:8px 18px 16px">
+        <table>
+          <thead><tr><th>date</th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr></thead>
+          <tbody id="previewTbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script th:src="@{/js/data.js}"></script>
+</body>
+</html>
