@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GA RollTrade · 回测结果</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">GA</div>
+      <div><h1>RollTrade</h1><p>遗传滚动择时</p></div>
+    </div>
+    <nav class="nav-list">
+      <a class="nav-item" th:href="@{/}"><span class="nav-icon">⌁</span><span>首页</span></a>
+      <a class="nav-item" th:href="@{/data}"><span class="nav-icon">▤</span><span>数据管理</span></a>
+      <a class="nav-item" th:href="@{/config}"><span class="nav-icon">◇</span><span>参数配置</span></a>
+      <a class="nav-item active" th:href="@{/result}"><span class="nav-icon">↗</span><span>回测结果</span></a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2>回测结果</h2>
+        <p id="subTitle">加载中…</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="secondary-button" th:href="@{/config}">重新回测</a>
+      </div>
+    </header>
+
+    <div id="alertBox"></div>
+
+    <div id="content" style="display:none">
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">优化策略绩效</span><h3>绩效指标</h3></div></div>
+        <div class="metric-grid" id="metricGrid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">行情与信号</span><h3>价格走势与买卖点</h3></div></div>
+        <div class="chart-frame large"><div id="priceChart" style="width:100%;height:100%"></div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">资金曲线对比</span><h3>优化策略 vs 固定策略</h3></div></div>
+        <div class="chart-frame medium"><div id="equityChart" style="width:100%;height:100%"></div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">回撤</span><h3>优化策略回撤曲线</h3></div></div>
+        <div class="chart-frame medium"><div id="drawdownChart" style="width:100%;height:100%"></div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">策略对比</span><h3>优化策略 vs 固定策略</h3></div></div>
+        <div class="table-wrap" style="padding:8px 18px 16px">
+          <table class="compare-table">
+            <thead><tr><th>指标</th><th>遗传优化策略</th><th>固定参数策略</th><th>买入持有</th></tr></thead>
+            <tbody id="compareTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">交易明细</span><h3>优化策略交易记录</h3></div></div>
+        <div class="table-wrap" style="padding:8px 18px 16px">
+          <table>
+            <thead><tr><th>时间</th><th>方向</th><th>价格</th><th>数量</th><th>手续费</th><th>单笔盈亏</th><th>持仓</th></tr></thead>
+            <tbody id="tradeTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">滚动窗口</span><h3>训练预测区间</h3></div></div>
+        <div class="table-wrap" style="padding:8px 18px 16px">
+          <table>
+            <thead><tr><th>窗口</th><th>训练区间</th><th>预测区间</th><th>最优适应度</th></tr></thead>
+            <tbody id="windowTbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script th:src="@{/js/result.js}"></script>
+</body>
+</html>
