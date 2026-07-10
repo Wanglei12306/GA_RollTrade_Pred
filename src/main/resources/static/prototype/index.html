@@ -3,278 +3,395 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GA RollTrade 原型界面</title>
+  <title>GA RollTrade · 量化策略分析系统（原型）</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <!-- 全局提示 -->
+  <div id="alertBox" style="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999;min-width:380px;max-width:640px"></div>
+
   <div class="app-shell">
+    <!-- ==================== 侧边栏 ==================== -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">GA</div>
-        <div>
-          <h1>RollTrade</h1>
-          <p>遗传滚动择时</p>
-        </div>
+        <div><h1>RollTrade</h1><p>遗传滚动择时</p></div>
       </div>
 
       <nav class="nav-list" aria-label="主导航">
-        <a class="nav-item active" href="#dashboard">
-          <span class="nav-icon">⌁</span>
-          <span>策略工作台</span>
+        <a class="nav-item active" href="#sec-home">
+          <span class="nav-icon">⌁</span><span>首页</span>
         </a>
-        <a class="nav-item" href="#data">
-          <span class="nav-icon">▤</span>
-          <span>数据管理</span>
+        <a class="nav-item" href="#sec-data">
+          <span class="nav-icon">▤</span><span>数据管理</span>
         </a>
-        <a class="nav-item" href="#params">
-          <span class="nav-icon">◇</span>
-          <span>参数配置</span>
+        <a class="nav-item" href="#sec-config">
+          <span class="nav-icon">◇</span><span>参数配置</span>
         </a>
-        <a class="nav-item" href="#result">
-          <span class="nav-icon">↗</span>
-          <span>回测结果</span>
+        <a class="nav-item" href="#sec-result">
+          <span class="nav-icon">↗</span><span>回测结果</span>
         </a>
       </nav>
 
       <div class="sidebar-block">
-        <span class="eyebrow">当前标的</span>
-        <strong>IF 主力连续</strong>
-        <small>2024-01-02 至 2025-06-30</small>
+        <span class="eyebrow">系统状态</span>
+        <strong id="sidebarStatus">数据已导入</strong>
+        <small id="sidebarSub">已有回测结果</small>
       </div>
     </aside>
 
+    <!-- ==================== 主内容区 ==================== -->
     <main class="main">
       <header class="topbar">
         <div>
-          <h2>量化策略分析工作台</h2>
+          <h2>基于遗传算法的量化策略分析系统</h2>
           <p>多技术指标池 · 遗传算法寻优 · 滚动窗口预测 · 标准化回测</p>
         </div>
         <div class="topbar-actions">
-          <button class="icon-button" title="刷新数据" aria-label="刷新数据">↻</button>
-          <button class="secondary-button">保存配置</button>
+          <button class="secondary-button" onclick="document.getElementById('sec-config').scrollIntoView({behavior:'smooth'})">参数配置</button>
           <button class="primary-button" id="runButton">开始回测</button>
         </div>
       </header>
 
+      <!-- 流程状态条 -->
       <section class="status-strip" aria-label="流程状态">
-        <div class="status-step done">
-          <span>1</span>
-          <strong>数据已导入</strong>
+        <div class="status-step done"><span>1</span><strong>数据已导入</strong></div>
+        <div class="status-step done"><span>2</span><strong>指标池已配置</strong></div>
+        <div class="status-step current"><span>3</span><strong>等待运行</strong></div>
+        <div class="status-step"><span>4</span><strong>结果生成</strong></div>
+      </section>
+
+      <!-- ==================== 第一页：首页 ==================== -->
+      <div class="section-divider" id="sec-home">◆ 首页 · 系统概述</div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">系统简介</span><h3>项目概述</h3></div>
         </div>
-        <div class="status-step done">
-          <span>2</span>
-          <strong>指标池已配置</strong>
-        </div>
-        <div class="status-step current">
-          <span>3</span>
-          <strong>等待运行</strong>
-        </div>
-        <div class="status-step">
-          <span>4</span>
-          <strong>结果生成</strong>
+        <div class="panel-body">
+          <p style="line-height:1.8;color:var(--muted);margin:0">
+            本系统面向<strong>股票与期货</strong>量化交易场景，构建覆盖趋势、震荡、波动率、成交量、乖离率等维度的
+            <strong>8 类技术指标池</strong>（MA、MACD、RSI、BOLL、KDJ、ATR、OBV、CCI），
+            通过<strong>遗传算法</strong>自动完成指标筛选、参数寻优、权重分配与交易阈值优化；
+            采用<strong>滚动窗口</strong>（3 月训练 / 1 月预测 / 1 月步长）训练与外推预测，
+            严格<strong>时序隔离</strong>以避免未来函数与过拟合；最终输出标准化回测绩效，并与固定参数策略对比，
+            验证动态寻优的有效性。系统不接入真实交易接口，所有信号仅用于策略研究与历史验证。
+          </p>
         </div>
       </section>
 
-      <section class="workspace-grid" id="dashboard">
-        <section class="panel market-panel">
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">运行流程</span><h3>四步完成策略分析</h3></div>
+        </div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="num">1</div>
+            <h4>数据导入</h4>
+            <p>上传 CSV 历史行情或加载示例数据，系统校验字段完整性、数值有效性和时间顺序</p>
+          </div>
+          <div class="flow-step">
+            <div class="num">2</div>
+            <h4>指标配置</h4>
+            <p>选择技术指标，设置遗传算法种群、迭代、交叉变异概率与适应度权重</p>
+          </div>
+          <div class="flow-step">
+            <div class="num">3</div>
+            <h4>遗传寻优</h4>
+            <p>滚动训练窗口独立运行遗传算法，严格时序隔离，外推预测买卖时机</p>
+          </div>
+          <div class="flow-step">
+            <div class="num">4</div>
+            <h4>回测展示</h4>
+            <p>执行标准化回测，展示绩效指标、资金曲线、回撤曲线与策略对比</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 第二页：数据管理 ==================== -->
+      <div class="section-divider" id="sec-data">◆ 数据管理 · 上传与预览</div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">数据导入</span><h3>上传行情数据</h3></div>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="fileInput" accept=".csv" style="flex:1;min-width:220px;height:38px;border:1px solid var(--line-strong);border-radius:8px;padding:0 10px;background:var(--surface)">
+            <button class="primary-button" id="uploadBtn">上传 CSV</button>
+            <button class="secondary-button" id="sampleBtn">加载示例数据</button>
+          </div>
+          <p class="hint">CSV 字段需包含：date, open, high, low, close, volume（字段名支持中英文别名，时间支持多种格式）</p>
+        </div>
+      </section>
+
+      <!-- 数据预览（初始隐藏） -->
+      <div id="previewPanel">
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">数据预览</span><h3 id="previewTitle">sample_stock.csv</h3></div>
+          </div>
+          <div class="metric-grid" id="summaryGrid">
+            <div class="metric"><span>数据行数</span><strong>12,420</strong></div>
+            <div class="metric"><span>起始时间</span><strong>2024-01-02</strong></div>
+            <div class="metric"><span>结束时间</span><strong>2025-06-30</strong></div>
+          </div>
+          <div class="chart-frame medium"><div id="previewChart" style="width:100%;height:100%"></div></div>
+          <div class="table-wrap" style="padding:8px 18px 16px">
+            <table>
+              <thead><tr><th>date</th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr></thead>
+              <tbody id="previewTbody">
+                <tr><td>2025-06-30</td><td>3485.20</td><td>3512.80</td><td>3478.00</td><td>3501.60</td><td>1850000</td></tr>
+                <tr><td>2025-06-27</td><td>3460.00</td><td>3492.40</td><td>3455.60</td><td>3485.20</td><td>1720000</td></tr>
+                <tr><td>2025-06-26</td><td>3472.60</td><td>3488.00</td><td>3448.20</td><td>3460.00</td><td>1680000</td></tr>
+                <tr><td>2025-06-25</td><td>3440.80</td><td>3480.40</td><td>3435.00</td><td>3472.60</td><td>1910000</td></tr>
+                <tr><td>2025-06-24</td><td>3428.00</td><td>3455.20</td><td>3418.60</td><td>3440.80</td><td>1630000</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- ==================== 第三页：参数配置 ==================== -->
+      <div class="section-divider" id="sec-config">◆ 参数配置 · 策略设置</div>
+
+      <form id="configForm" onsubmit="return false">
+        <!-- 技术指标池 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">指标池</span><h3>技术指标选择（UC-04）</h3></div>
+          </div>
+          <div class="panel-body">
+            <div class="chip-grid">
+              <label class="check-chip"><input type="checkbox" name="indicators" value="MA" checked>MA</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="MACD" checked>MACD</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="RSI" checked>RSI</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="BOLL" checked>BOLL</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="KDJ">KDJ</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="ATR">ATR</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="OBV">OBV</label>
+              <label class="check-chip"><input type="checkbox" name="indicators" value="CCI">CCI</label>
+            </div>
+            <p class="hint">勾选参与遗传算法优化的指标（建议至少 2 个）。指标参数候选集由系统自动配置多组方案。</p>
+          </div>
+        </section>
+
+        <!-- 遗传算法参数 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">遗传算法</span><h3>GA 参数（UC-05）</h3></div>
+          </div>
+          <div class="form-grid">
+            <div><label>种群规模</label><input type="number" name="populationSize" value="80" min="20" max="500"></div>
+            <div><label>迭代次数</label><input type="number" name="generations" value="120" min="10" max="1000"></div>
+            <div><label>交叉概率 (0~1)</label><input type="number" name="crossoverRate" value="0.78" min="0" max="1" step="0.01"></div>
+            <div><label>变异概率 (0~1)</label><input type="number" name="mutationRate" value="0.08" min="0" max="1" step="0.01"></div>
+          </div>
+        </section>
+
+        <!-- 适应度权重 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">适应度函数</span><h3>多维度综合评分权重</h3></div>
+          </div>
+          <div class="panel-body">
+            <div class="weight-tags">
+              <label class="weight-tag">年化收益率 <input type="number" value="0.30" min="0" max="1" step="0.05"></label>
+              <label class="weight-tag">最大回撤 <input type="number" value="0.25" min="0" max="1" step="0.05"></label>
+              <label class="weight-tag">夏普比率 <input type="number" value="0.20" min="0" max="1" step="0.05"></label>
+              <label class="weight-tag">胜率 <input type="number" value="0.15" min="0" max="1" step="0.05"></label>
+              <label class="weight-tag">盈亏比 <input type="number" value="0.10" min="0" max="1" step="0.05"></label>
+            </div>
+            <p class="hint">权重之和建议为 1.0，适应度函数综合评估收益稳定性、风险控制与交易质量。</p>
+          </div>
+        </section>
+
+        <!-- 滚动窗口参数 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">滚动窗口</span><h3>训练 / 预测 / 步长（月）（UC-06）</h3></div>
+          </div>
+          <div class="form-grid">
+            <div><label>训练窗口（月）</label><input type="number" name="trainMonths" value="3" min="1" max="12"></div>
+            <div><label>预测窗口（月）</label><input type="number" name="predictMonths" value="1" min="1" max="6"></div>
+            <div><label>滚动步长（月）</label><input type="number" name="stepMonths" value="1" min="1" max="6"></div>
+          </div>
+          <p class="hint" style="padding:0 18px">默认 3 个月训练、1 个月预测、1 个月滚动步长。训练集与测试集严格按时间切分。</p>
+        </section>
+
+        <!-- 资金与手续费 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">回测设置</span><h3>资金与手续费</h3></div>
+          </div>
+          <div class="form-grid">
+            <div><label>初始资金</label><input type="number" name="initialCapital" value="1000000" min="1000"></div>
+            <div><label>手续费率</label><input type="number" name="commissionRate" value="0.0003" min="0" max="0.01" step="0.0001"></div>
+          </div>
+        </section>
+
+        <div style="text-align:right;padding:0 4px 24px">
+          <button type="button" class="secondary-button" style="min-height:44px;padding:0 24px;margin-right:10px" id="saveConfigBtn">保存配置</button>
+          <button type="submit" class="primary-button" style="min-height:44px;padding:0 28px" id="startBacktestBtn">开始回测</button>
+        </div>
+      </form>
+
+      <!-- ==================== 第四页：回测结果 ==================== -->
+      <div class="section-divider" id="sec-result">◆ 回测结果 · 绩效与图表</div>
+
+      <!-- 加载中提示 -->
+      <div id="resultLoading" style="display:none">
+        <div class="alert alert-info">遗传算法正在滚动窗口训练中，请稍候…</div>
+      </div>
+
+      <!-- 无结果提示 -->
+      <div id="resultEmpty">
+        <div class="alert alert-info">
+          尚未运行回测。请先完成
+          <a href="#sec-data" style="color:var(--accent);font-weight:700">数据导入</a> 并
+          <a href="#sec-config" style="color:var(--accent);font-weight:700">配置参数</a>，然后点击「开始回测」。
+        </div>
+      </div>
+
+      <!-- 结果内容（初始隐藏） -->
+      <div id="resultContent" style="display:none">
+
+        <!-- 4.7.2 绩效指标 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">优化策略绩效（UC-10）</span><h3>回测指标</h3></div>
+          </div>
+          <div class="metric-grid" id="metricGrid">
+            <div class="metric"><span>累计收益</span><strong class="positive">36.82%</strong></div>
+            <div class="metric"><span>年化收益</span><strong class="positive">18.41%</strong></div>
+            <div class="metric"><span>最大回撤</span><strong class="negative">-8.76%</strong></div>
+            <div class="metric"><span>夏普比率</span><strong>1.62</strong></div>
+            <div class="metric"><span>胜率</span><strong>57.4%</strong></div>
+            <div class="metric"><span>盈亏比</span><strong>1.91</strong></div>
+            <div class="metric"><span>交易次数</span><strong>28</strong></div>
+            <div class="metric"><span>买入持有</span><strong class="positive">12.15%</strong></div>
+          </div>
+        </section>
+
+        <!-- 4.7.2 价格走势与买卖信号 -->
+        <section class="panel">
           <div class="panel-head">
             <div>
               <span class="eyebrow">行情与信号</span>
-              <h3>K 线走势与买卖点</h3>
+              <h3>价格走势与买卖点标记</h3>
             </div>
-            <div class="segmented" role="tablist" aria-label="周期">
+            <div class="segmented" role="tablist" aria-label="周期切换">
               <button class="active">日线</button>
               <button>周线</button>
               <button>月线</button>
             </div>
           </div>
-          <div class="chart-frame large">
-            <canvas id="priceChart" width="920" height="380" aria-label="价格走势图"></canvas>
-          </div>
+          <div class="chart-frame large"><div id="priceChart" style="width:100%;height:100%"></div></div>
           <div class="legend-row">
             <span><i class="legend-line price"></i>收盘价</span>
-            <span><i class="legend-dot buy"></i>买入信号</span>
-            <span><i class="legend-dot sell"></i>卖出信号</span>
             <span><i class="legend-line ma"></i>MA20</span>
+            <span><i class="legend-dot buy"></i>买入 BUY</span>
+            <span><i class="legend-dot sell"></i>卖出 SELL</span>
           </div>
         </section>
 
-        <aside class="panel config-panel" id="params">
-          <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">策略参数</span>
-              <h3>训练配置</h3>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label>行情数据</label>
-            <div class="upload-box" id="data">
-              <span class="upload-icon">⇧</span>
-              <strong>sample_future.csv</strong>
-              <small>12,420 行 · 6 个字段</small>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label>指标池</label>
-            <div class="chip-grid">
-              <label class="check-chip"><input type="checkbox" checked>MA</label>
-              <label class="check-chip"><input type="checkbox" checked>MACD</label>
-              <label class="check-chip"><input type="checkbox" checked>RSI</label>
-              <label class="check-chip"><input type="checkbox" checked>BOLL</label>
-              <label class="check-chip"><input type="checkbox">KDJ</label>
-              <label class="check-chip"><input type="checkbox">ATR</label>
-              <label class="check-chip"><input type="checkbox">OBV</label>
-              <label class="check-chip"><input type="checkbox">CCI</label>
-            </div>
-          </div>
-
-          <div class="field-row">
-            <label>
-              <span>训练窗口</span>
-              <select>
-                <option>3 个月</option>
-                <option>6 个月</option>
-                <option>12 个月</option>
-              </select>
-            </label>
-            <label>
-              <span>预测窗口</span>
-              <select>
-                <option>1 个月</option>
-                <option>2 周</option>
-                <option>2 个月</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="field-row">
-            <label>
-              <span>种群规模</span>
-              <input type="number" value="80" min="20" max="500">
-            </label>
-            <label>
-              <span>迭代次数</span>
-              <input type="number" value="120" min="20" max="1000">
-            </label>
-          </div>
-
-          <div class="slider-field">
-            <div>
-              <label for="crossRate">交叉概率</label>
-              <strong id="crossValue">0.78</strong>
-            </div>
-            <input id="crossRate" type="range" min="0" max="1" value="0.78" step="0.01">
-          </div>
-
-          <div class="slider-field">
-            <div>
-              <label for="mutationRate">变异概率</label>
-              <strong id="mutationValue">0.08</strong>
-            </div>
-            <input id="mutationRate" type="range" min="0" max="0.5" value="0.08" step="0.01">
-          </div>
-        </aside>
-      </section>
-
-      <section class="lower-grid" id="result">
-        <section class="panel metrics-panel">
+        <!-- 4.7.2 多技术指标曲线 -->
+        <section class="panel">
           <div class="panel-head">
-            <div>
-              <span class="eyebrow">回测概览</span>
-              <h3>绩效指标</h3>
-            </div>
+            <div><span class="eyebrow">技术指标</span><h3>多指标走势（UC-10）</h3></div>
           </div>
-          <div class="metric-grid">
-            <div class="metric">
-              <span>累计收益</span>
-              <strong class="positive">36.82%</strong>
-            </div>
-            <div class="metric">
-              <span>年化收益</span>
-              <strong class="positive">18.41%</strong>
-            </div>
-            <div class="metric">
-              <span>最大回撤</span>
-              <strong class="negative">-8.76%</strong>
-            </div>
-            <div class="metric">
-              <span>夏普比率</span>
-              <strong>1.62</strong>
-            </div>
-            <div class="metric">
-              <span>胜率</span>
-              <strong>57.4%</strong>
-            </div>
-            <div class="metric">
-              <span>盈亏比</span>
-              <strong>1.91</strong>
-            </div>
+          <div class="chart-row" style="padding:12px 16px 8px">
+            <div class="chart-frame medium"><div id="macdChart" style="width:100%;height:100%"></div></div>
+            <div class="chart-frame medium"><div id="rsiChart" style="width:100%;height:100%"></div></div>
           </div>
         </section>
 
-        <section class="panel curve-panel">
-          <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">资金曲线</span>
-              <h3>净值与回撤</h3>
-            </div>
+        <!-- 4.7.2 资金曲线对比 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">资金曲线对比（UC-12）</span><h3>优化策略 vs 固定策略 vs 买入持有</h3></div>
           </div>
-          <div class="chart-frame small">
-            <canvas id="equityChart" width="620" height="230" aria-label="资金曲线"></canvas>
+          <div class="chart-frame medium"><div id="equityChart" style="width:100%;height:100%"></div></div>
+          <div class="legend-row">
+            <span><i class="legend-line equity"></i>遗传优化策略</span>
+            <span><i class="legend-line fixed"></i>固定参数策略</span>
           </div>
         </section>
 
-        <section class="panel trade-panel">
-          <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">交易明细</span>
-              <h3>最近交易</h3>
-            </div>
-            <button class="text-button">导出</button>
+        <!-- 4.7.2 回撤曲线（面积图） -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">风险分析</span><h3>回撤曲线（UC-10）</h3></div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>方向</th>
-                  <th>价格</th>
-                  <th>收益</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>2025-06-12</td>
-                  <td><span class="tag buy">买入</span></td>
-                  <td>3472.6</td>
-                  <td class="positive">+2.31%</td>
-                  <td>已平仓</td>
-                </tr>
-                <tr>
-                  <td>2025-05-27</td>
-                  <td><span class="tag sell">卖出</span></td>
-                  <td>3391.2</td>
-                  <td class="negative">-0.84%</td>
-                  <td>已平仓</td>
-                </tr>
-                <tr>
-                  <td>2025-04-18</td>
-                  <td><span class="tag buy">买入</span></td>
-                  <td>3316.8</td>
-                  <td class="positive">+4.06%</td>
-                  <td>已平仓</td>
-                </tr>
+          <div class="chart-frame medium"><div id="drawdownChart" style="width:100%;height:100%"></div></div>
+        </section>
+
+        <!-- 4.8 策略对比表格 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">策略对比（UC-12）</span><h3>遗传优化 vs 固定参数 vs 买入持有</h3></div>
+          </div>
+          <div class="table-wrap" style="padding:8px 18px 16px">
+            <table class="compare-table">
+              <thead><tr><th>指标</th><th>遗传优化策略</th><th>固定参数策略</th><th>买入持有</th></tr></thead>
+              <tbody id="compareTbody">
+                <tr><td>累计收益</td><td class="positive">36.82%</td><td class="positive">21.54%</td><td class="positive">12.15%</td></tr>
+                <tr><td>年化收益</td><td class="positive">18.41%</td><td class="positive">10.77%</td><td>—</td></tr>
+                <tr><td>最大回撤</td><td class="negative">-8.76%</td><td class="negative">-14.32%</td><td class="negative">-18.50%</td></tr>
+                <tr><td>夏普比率</td><td>1.62</td><td>0.94</td><td>—</td></tr>
+                <tr><td>胜率</td><td>57.4%</td><td>48.2%</td><td>—</td></tr>
+                <tr><td>盈亏比</td><td>1.91</td><td>1.35</td><td>—</td></tr>
+                <tr><td>交易次数</td><td>28</td><td>35</td><td>—</td></tr>
               </tbody>
             </table>
           </div>
         </section>
-      </section>
+
+        <!-- 4.6.3 交易记录表 -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">交易明细（UC-11）</span><h3>优化策略交易记录</h3></div>
+            <button class="text-button" id="exportTradesBtn">导出 CSV</button>
+          </div>
+          <div class="table-wrap" style="padding:8px 18px 16px">
+            <table>
+              <thead><tr><th>交易时间</th><th>方向</th><th>价格</th><th>数量</th><th>手续费</th><th>单笔盈亏</th><th>持仓状态</th></tr></thead>
+              <tbody id="tradeTbody">
+                <tr><td>2025-06-12</td><td><span class="tag buy">BUY</span></td><td>3472.60</td><td>10</td><td>10.42</td><td class="positive">+2,310</td><td>已平仓</td></tr>
+                <tr><td>2025-05-27</td><td><span class="tag sell">SELL</span></td><td>3391.20</td><td>10</td><td>10.17</td><td class="negative">-840</td><td>已平仓</td></tr>
+                <tr><td>2025-04-18</td><td><span class="tag buy">BUY</span></td><td>3316.80</td><td>10</td><td>9.95</td><td class="positive">+4,060</td><td>已平仓</td></tr>
+                <tr><td>2025-03-05</td><td><span class="tag sell">SELL</span></td><td>3420.50</td><td>10</td><td>10.26</td><td class="negative">-1,520</td><td>已平仓</td></tr>
+                <tr><td>2025-02-14</td><td><span class="tag buy">BUY</span></td><td>3280.00</td><td>10</td><td>9.84</td><td>—</td><td>持仓中</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 滚动窗口表（UC-08 要求） -->
+        <section class="panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">滚动窗口（UC-08）</span><h3>训练预测区间与最优适应度</h3></div>
+          </div>
+          <div class="table-wrap" style="padding:8px 18px 16px">
+            <table>
+              <thead><tr><th>窗口</th><th>训练区间</th><th>预测区间</th><th>最优适应度</th><th>选中指标</th></tr></thead>
+              <tbody id="windowTbody">
+                <tr><td>1</td><td>2024-01-02 ~ 2024-04-01</td><td>2024-04-02 ~ 2024-05-01</td><td>0.8247</td><td>MA, MACD, RSI, BOLL</td></tr>
+                <tr><td>2</td><td>2024-02-01 ~ 2024-05-01</td><td>2024-05-02 ~ 2024-06-01</td><td>0.8512</td><td>MA, MACD, BOLL, KDJ</td></tr>
+                <tr><td>3</td><td>2024-03-01 ~ 2024-06-01</td><td>2024-06-02 ~ 2024-07-01</td><td>0.7983</td><td>MACD, RSI, BOLL, ATR</td></tr>
+                <tr><td>4</td><td>2024-04-01 ~ 2024-07-01</td><td>2024-07-02 ~ 2024-08-01</td><td>0.8366</td><td>MA, RSI, BOLL, CCI</td></tr>
+                <tr><td>5</td><td>2024-05-01 ~ 2024-08-01</td><td>2024-08-02 ~ 2024-09-01</td><td>0.8721</td><td>MA, MACD, RSI, BOLL</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div><!-- /#resultContent -->
+
     </main>
   </div>
 
+  <!-- ECharts（需求文档 3.3 指定） -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
