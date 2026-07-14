@@ -20,12 +20,20 @@ public class StrategyConfig {
     private double initialCapital = 1_000_000;
     private double commissionRate = 0.0003; // 万三手续费
 
-    // 适应度五维权重：年化收益、(1-最大回撤)、夏普、胜率、盈亏比
+    // —— 择时模型训练参数（当前版本唯一训练目标：择时）——
+    private int forecastDays = 5;          // 标签 horizon：预测未来几根的方向
+    private double labelThreshold = 0.0;   // 涨跌中性带，|未来收益| <= 该值视为中性(0)
+
+    // —— 训练适应度权重：五维盈亏综合（驱动 GA 寻优，见 FitnessEvaluator）——
     private double wReturn = 0.30;
     private double wDrawdown = 0.25;
     private double wSharpe = 0.20;
     private double wWinRate = 0.10;
     private double wProfitLoss = 0.15;
+
+    // —— 辅助可验证性权重（不驱动训练，仅用于方向预测准确率展示）——
+    private double wAccuracy = 0.6;
+    private double wReturnWeighted = 0.4;
 
     public List<String> getIndicators() { return indicators; }
     public void setIndicators(List<String> indicators) { this.indicators = indicators; }
@@ -71,4 +79,16 @@ public class StrategyConfig {
 
     public double getwProfitLoss() { return wProfitLoss; }
     public void setwProfitLoss(double wProfitLoss) { this.wProfitLoss = wProfitLoss; }
+
+    public int getForecastDays() { return forecastDays; }
+    public void setForecastDays(int forecastDays) { this.forecastDays = forecastDays; }
+
+    public double getLabelThreshold() { return labelThreshold; }
+    public void setLabelThreshold(double labelThreshold) { this.labelThreshold = labelThreshold; }
+
+    public double getwAccuracy() { return wAccuracy; }
+    public void setwAccuracy(double wAccuracy) { this.wAccuracy = wAccuracy; }
+
+    public double getwReturnWeighted() { return wReturnWeighted; }
+    public void setwReturnWeighted(double wReturnWeighted) { this.wReturnWeighted = wReturnWeighted; }
 }

@@ -1,5 +1,6 @@
 package com.example.quant.rolling;
 
+import com.example.quant.ga.FitnessEvaluator;
 import com.example.quant.ga.GeneticAlgorithm;
 import com.example.quant.model.Chromosome;
 import com.example.quant.model.KLine;
@@ -34,10 +35,13 @@ public class RollingWindowService {
 
     private final GeneticAlgorithm geneticAlgorithm;
     private final SignalGenerator signalGenerator;
+    private final FitnessEvaluator fitnessEvaluator;
 
-    public RollingWindowService(GeneticAlgorithm geneticAlgorithm, SignalGenerator signalGenerator) {
+    public RollingWindowService(GeneticAlgorithm geneticAlgorithm, SignalGenerator signalGenerator,
+                                FitnessEvaluator fitnessEvaluator) {
         this.geneticAlgorithm = geneticAlgorithm;
         this.signalGenerator = signalGenerator;
+        this.fitnessEvaluator = fitnessEvaluator;
     }
 
     public RollingResult run(List<KLine> klines, List<com.example.quant.indicator.Indicator> indicators,
@@ -77,8 +81,14 @@ public class RollingWindowService {
             double[][][] trainCache = signalGenerator.precomputeScores(indicators, trainKlines);
             Chromosome best = geneticAlgorithm.evolve(indicators, trainKlines, trainCache, config);
 
+            // 训练准确率：模型在训练集上的择时方向预测准确率（可验证性）
+            double trainAcc = fitnessEvaluator.accuracy(best, indicators.size(), trainKlines, trainCache, config);
+
             double[][][] predictCache = signalGenerator.precomputeScores(indicators, predictKlines);
             Signal[] predictSignals = signalGenerator.generate(best, indicators.size(), predictCache);
+
+            // 测试准确率：模型在样本外预测窗口上的方向预测准确率
+            double testAcc = fitnessEvaluator.accuracy(best, indicators.size(), predictKlines, predictCache, config);
 
             for (int i = 0; i < predictKlines.size(); i++) {
                 LocalDate d = predictKlines.get(i).getDate();
@@ -89,11 +99,12 @@ public class RollingWindowService {
             windows.add(new WindowResult(
                     trainKlines.get(0).getDate(), trainKlines.get(trainKlines.size() - 1).getDate(),
                     predictKlines.get(0).getDate(), predictKlines.get(predictKlines.size() - 1).getDate(),
-                    best.getFitness(), best));
+                    best.getFitness(), trainAcc, testAcc, best));
 
-            log.info("窗口 {}: 训练 {}~{}, 预测 {}~{}, 最优适应度={}",
+            log.info("窗口 {}: 训练 {}~{}, 预测 {}~{}, 适应度={}, 训练准确率={}, 测试准确率={}",
                     windows.size(), trainStart, trainEnd, predictStart, predictEnd,
-                    String.format("%.4f", best.getFitness()));
+                    String.format("%.4f", best.getFitness()),
+                    String.format("%.4f", trainAcc), String.format("%.4f", testAcc));
         }
 
         if (outOfSampleDates.isEmpty()) {

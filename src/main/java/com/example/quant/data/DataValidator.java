@@ -2,8 +2,10 @@ package com.example.quant.data;
 
 import org.apache.commons.csv.CSVRecord;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -71,6 +73,11 @@ public final class DataValidator {
             throw new DataValidationException("时间字段不能为空，请检查日期格式");
         }
         String text = raw.trim();
+
+        // 纯数字：按 Unix 时间戳处理（10 位=秒，13 位=毫秒），按系统时区转日期
+        LocalDate epoch = parseEpochIfNumeric(text);
+        if (epoch != null) return epoch;
+
         for (DateTimeFormatter fmt : DATE_FORMATS) {
             try {
                 if (fmt.toString().contains("HH")) {
@@ -82,6 +89,23 @@ public final class DataValidator {
             }
         }
         throw new DataValidationException("时间字段无法解析，请检查日期格式：" + raw);
+    }
+
+    /** 纯数字且 10~13 位时按时间戳解析（秒/毫秒），否则返回 null。 */
+    private static LocalDate parseEpochIfNumeric(String text) {
+        if (text.length() < 10 || text.length() > 13) return null;
+        for (int i = 0; i < text.length(); i++) {
+            if (!Character.isDigit(text.charAt(i))) return null;
+        }
+        try {
+            long v = Long.parseLong(text);
+            Instant instant = text.length() >= 13
+                    ? Instant.ofEpochMilli(v)
+                    : Instant.ofEpochSecond(v);
+            return instant.atZone(ZoneId.systemDefault()).toLocalDate();
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** 解析数值字段，非法时抛出明确提示。 */

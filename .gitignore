@@ -7,6 +7,9 @@
 *.war
 target/
 
+# 训练产物（落盘的择时模型）
+models/
+
 # OS
 .DS_Store
 Thumbs.db
