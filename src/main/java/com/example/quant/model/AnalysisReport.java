@@ -3,7 +3,8 @@ package com.example.quant.model;
 import java.util.List;
 
 /**
- * 一次完整分析的汇总报告：优化策略与固定策略的回测结果对比 + 滚动窗口记录。
+ * 一次完整分析的汇总报告：优化策略与固定策略的回测结果对比 + 滚动窗口记录 +
+ * 多指标信号曲线 + 年度收益统计。
  */
 public class AnalysisReport {
 
@@ -13,15 +14,20 @@ public class AnalysisReport {
     private final List<KLine> outOfSampleKlines;   // 样本外行情（用于价格图与买卖点）
     private final StrategyConfig config;
     private final String dataName;
+    private final List<IndicatorCurve> indicatorCurves;   // 多指标信号曲线（样本外）
+    private final List<AnnualReturn> annualReturns;       // 年度收益统计
 
     public AnalysisReport(BacktestResult optimized, BacktestResult fixed, List<WindowResult> windows,
-                          List<KLine> outOfSampleKlines, StrategyConfig config, String dataName) {
+                          List<KLine> outOfSampleKlines, StrategyConfig config, String dataName,
+                          List<IndicatorCurve> indicatorCurves, List<AnnualReturn> annualReturns) {
         this.optimized = optimized;
         this.fixed = fixed;
         this.windows = windows;
         this.outOfSampleKlines = outOfSampleKlines;
         this.config = config;
         this.dataName = dataName;
+        this.indicatorCurves = indicatorCurves;
+        this.annualReturns = annualReturns;
     }
 
     public BacktestResult getOptimized() { return optimized; }
@@ -30,4 +36,12 @@ public class AnalysisReport {
     public List<KLine> getOutOfSampleKlines() { return outOfSampleKlines; }
     public StrategyConfig getConfig() { return config; }
     public String getDataName() { return dataName; }
+    public List<IndicatorCurve> getIndicatorCurves() { return indicatorCurves; }
+    public List<AnnualReturn> getAnnualReturns() { return annualReturns; }
+
+    /** 多指标信号曲线：指标名 + 样本外每根 K 线的信号评分（[-1,1]）。 */
+    public record IndicatorCurve(String name, double[] scores) {}
+
+    /** 年度收益统计：年份 + 该年收益率。 */
+    public record AnnualReturn(int year, double returnRate) {}
 }

@@ -33,11 +33,14 @@ function render(report) {
   ].join("");
 
   renderPrice(report);
+  renderIndicators(report);
   renderEquity(opt, fix);
   renderDrawdown(opt);
+  renderDrawdownDist(opt);
   renderCompare(m, fix.metrics);
   renderTrades(opt.trades);
   renderWindows(report.windows);
+  renderAnnual(report.annualReturns);
 }
 
 function renderPrice(report) {
@@ -122,6 +125,65 @@ function renderTrades(trades) {
 function renderWindows(windows) {
   document.getElementById("windowTbody").innerHTML = windows.map((w, i) =>
     `<tr><td>${i + 1}</td><td>${w.trainStart} ~ ${w.trainEnd}</td><td>${w.predictStart} ~ ${w.predictEnd}</td><td>${num(w.bestFitness, 4)}</td></tr>`
+  ).join("");
+}
+
+function renderIndicators(report) {
+  const curves = report.indicatorCurves || [];
+  const dates = report.outOfSampleKlines.map(k => k.date);
+  const el = document.getElementById("indicatorChart");
+  if (!curves.length) { el.innerHTML = '<p class="hint" style="padding:16px">无指标信号数据</p>'; return; }
+  const chart = echarts.init(el);
+  const series = curves.map(c => ({
+    name: c.name, type: "line", data: c.scores, showSymbol: false, lineStyle: { width: 1.5 }
+  }));
+  chart.setOption({
+    grid: { left: 54, right: 20, top: 40, bottom: 40 },
+    legend: { data: curves.map(c => c.name), top: 0, type: "scroll" },
+    xAxis: { type: "category", data: dates, axisLabel: { fontSize: 10 } },
+    yAxis: { type: "value", min: -1, max: 1, name: "信号分" },
+    tooltip: { trigger: "axis" },
+    series
+  });
+}
+
+function renderDrawdownDist(opt) {
+  const dd = opt.drawdownCurve || [];
+  const el = document.getElementById("drawdownDistChart");
+  if (!dd.length) { el.innerHTML = '<p class="hint" style="padding:16px">无回撤数据</p>'; return; }
+  const buckets = [
+    { label: "0~1%", min: 0, max: 0.01, count: 0 },
+    { label: "1~3%", min: 0.01, max: 0.03, count: 0 },
+    { label: "3~5%", min: 0.03, max: 0.05, count: 0 },
+    { label: "5~10%", min: 0.05, max: 0.10, count: 0 },
+    { label: ">10%", min: 0.10, max: Infinity, count: 0 }
+  ];
+  for (const v of dd) {
+    for (const b of buckets) {
+      if (v >= b.min && v < b.max) { b.count++; break; }
+    }
+  }
+  const chart = echarts.init(el);
+  chart.setOption({
+    grid: { left: 54, right: 20, top: 30, bottom: 40 },
+    xAxis: { type: "category", data: buckets.map(b => b.label) },
+    yAxis: { type: "value", name: "根数" },
+    tooltip: { trigger: "axis" },
+    series: [{
+      type: "bar", data: buckets.map(b => b.count),
+      itemStyle: { color: "#c84646" }, label: { show: true, position: "top" }
+    }]
+  });
+}
+
+function renderAnnual(annualReturns) {
+  const tbody = document.getElementById("annualTbody");
+  if (!annualReturns || !annualReturns.length) {
+    tbody.innerHTML = '<tr><td colspan="2">无年度收益数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = annualReturns.map(a =>
+    `<tr><td>${a.year}</td><td><span class="${cls(a.returnRate)}">${pct(a.returnRate)}</span></td></tr>`
   ).join("");
 }
 
