@@ -46,6 +46,11 @@
       </section>
 
       <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">多指标信号</span><h3>技术指标信号曲线</h3></div></div>
+        <div class="chart-frame medium"><div id="indicatorChart" style="width:100%;height:100%"></div></div>
+      </section>
+
+      <section class="panel">
         <div class="panel-head"><div><span class="eyebrow">资金曲线对比</span><h3>优化策略 vs 固定策略</h3></div></div>
         <div class="chart-frame medium"><div id="equityChart" style="width:100%;height:100%"></div></div>
       </section>
@@ -56,11 +61,26 @@
       </section>
 
       <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">回撤分布</span><h3>回撤幅度分布统计</h3></div></div>
+        <div class="chart-frame medium"><div id="drawdownDistChart" style="width:100%;height:100%"></div></div>
+      </section>
+
+      <section class="panel">
         <div class="panel-head"><div><span class="eyebrow">策略对比</span><h3>优化策略 vs 固定策略</h3></div></div>
         <div class="table-wrap" style="padding:8px 18px 16px">
           <table class="compare-table">
             <thead><tr><th>指标</th><th>遗传优化策略</th><th>固定参数策略</th><th>买入持有</th></tr></thead>
             <tbody id="compareTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">年度收益</span><h3>年度收益统计表</h3></div></div>
+        <div class="table-wrap" style="padding:8px 18px 16px">
+          <table>
+            <thead><tr><th>年份</th><th>年度收益率</th></tr></thead>
+            <tbody id="annualTbody"></tbody>
           </table>
         </div>
       </section>
