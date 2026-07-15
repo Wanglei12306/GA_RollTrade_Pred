@@ -69,36 +69,27 @@ public class FitnessEvaluator {
     }
 
     /**
-     * 方向预测准确率（[0,1]，无有效样本返回 NaN）—— <b>辅助可验证性指标</b>，不驱动训练。
-     * 用于训练/测试集可验证性展示与 predict 流程：把染色体的 BUY/SELL/HOLD 信号映射为
-     * {+1,-1,0}，与未来 N 日涨跌方向标签（{@link TimingLabel}）比对。
+     * 方向预测准确率（[0,1]，无可标注样本返回 NaN）—— <b>辅助可验证性指标</b>，不驱动训练。
+     * 把染色体的 BUY/SELL/HOLD 信号与未来 N 日涨跌方向标签（{@link TimingLabel}）比对，
+     * 全部可标注 bar 计入分母，HOLD 匹配中性标签算正确。阈值自适应：
+     * {@link StrategyConfig#getLabelThreshold()} &lt;= 0 时按窗口波动率自动取中性带，
+     * 避免 threshold=0 下标签恒为 ±1、HOLD 被自动判错。
      */
     public double accuracy(Chromosome chr, int indicatorCount, List<KLine> klines,
                            double[][][] cache, StrategyConfig config) {
-        int h = config.getForecastDays();
-        double[] labels = TimingLabel.labels(klines, h, config.getLabelThreshold());
-        int[] pred = predictions(chr, indicatorCount, cache);
-        int valid = 0, correct = 0;
-        for (int t = 0; t < labels.length; t++) {
-            if (Double.isNaN(labels[t])) continue;
-            valid++;
-            if (pred[t] == (int) labels[t]) correct++;
-        }
-        return valid > 0 ? (double) correct / valid : Double.NaN;
+        Signal[] signals = signalGenerator.generate(chr, indicatorCount, cache);
+        double threshold = TimingLabel.adaptiveThreshold(klines, config.getForecastDays(), config.getLabelThreshold());
+        return TimingLabel.directionalAccuracy(signals, klines, config.getForecastDays(), threshold);
     }
 
-    /** 染色体在缓存上的方向预测序列：BUY→+1, SELL→-1, HOLD→0。 */
-    private int[] predictions(Chromosome chr, int indicatorCount, double[][][] cache) {
+    /**
+     * 表态率（[0,1]，伴生指标）：标签可得 bar 中策略发出 BUY/SELL 的占比。
+     * 表态率过低时准确率不具备统计意义，暴露靠全 HOLD 刷高准确率的策略。
+     */
+    public double commitmentRate(Chromosome chr, int indicatorCount, List<KLine> klines,
+                                 double[][][] cache, StrategyConfig config) {
         Signal[] signals = signalGenerator.generate(chr, indicatorCount, cache);
-        int[] pred = new int[signals.length];
-        for (int i = 0; i < signals.length; i++) {
-            pred[i] = switch (signals[i]) {
-                case BUY -> 1;
-                case SELL -> -1;
-                case HOLD -> 0;
-            };
-        }
-        return pred;
+        return TimingLabel.commitmentRate(signals, klines, config.getForecastDays());
     }
 
     private static double clamp(double v, double lo, double hi) {

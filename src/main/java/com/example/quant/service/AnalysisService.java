@@ -150,10 +150,13 @@ public class AnalysisService {
 
         double[][][] cache = signalGenerator.precomputeScores(indicators, klines);
         Signal[] signals = signalGenerator.generate(chr, indicators.size(), cache);
-        double[] labels = TimingLabel.labels(klines, model.forecastDays(), model.labelThreshold());
+        // 阈值自适应：labelThreshold<=0 时按当前数据波动率取中性带，与训练侧 accuracy 语义一致
+        double threshold = TimingLabel.adaptiveThreshold(klines, model.forecastDays(), model.labelThreshold());
+        double[] labels = TimingLabel.labels(klines, model.forecastDays(), threshold);
 
         int countBuy = 0, countSell = 0, countHold = 0;
-        int verified = 0, correct = 0, forward = 0;
+        int verified = 0, forward = 0;        // verified=标签可得根数；forward=尾部不可标注根数
+        int committed = 0, correct = 0;        // committed=已表态(非HOLD)且可验证(信息性)；correct=命中标签
         List<BarPrediction> bars = new ArrayList<>(klines.size());
         for (int t = 0; t < klines.size(); t++) {
             KLine k = klines.get(t);
@@ -175,8 +178,9 @@ public class AnalysisService {
                 verified++;
                 if (dir == label) {
                     correct++;
-                    ok = true;
+                    ok = true;                // 逐根：信号是否匹配标签（含 HOLD 匹配中性）
                 }
+                if (dir != 0) committed++;    // 信息性：已表态根数
             } else {
                 forward++;
             }
@@ -188,6 +192,7 @@ public class AnalysisService {
                     label,
                     ok));
         }
+        // 方向准确率：全部可验证根上信号是否匹配标签（HOLD 匹配中性算正确），与训练侧 accuracy 口径一致
         Double accuracy = verified > 0 ? (double) correct / verified : null;
 
         lastPrediction = new PredictionResult(
@@ -201,9 +206,9 @@ public class AnalysisService {
                 verified, forward,
                 accuracy,
                 bars);
-        log.info("预测完成：BUY={} SELL={} HOLD={}，可验证 {} 根准确率={}，向前预测 {} 根",
+        log.info("预测完成：BUY={} SELL={} HOLD={}，可验证 {} 根（已表态 {} 根准确率={}），向前预测 {} 根",
                 countBuy, countSell, countHold,
-                verified,
+                verified, committed,
                 accuracy == null ? "N/A" : String.format("%.4f", accuracy),
                 forward);
         return lastPrediction;
