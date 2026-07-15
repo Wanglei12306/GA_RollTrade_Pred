@@ -56,7 +56,7 @@ public final class DataValidator {
         checkOne(headerMap, LOW_ALIASES, "low", missing);
         checkOne(headerMap, CLOSE_ALIASES, "close", missing);
         if (missing.length() > 0) {
-            throw new DataValidationException("缺少必要字段：" + missing.substring(2));
+            throw new DataValidationException("缺少必要字段：" + missing.substring(1));
         }
     }
 

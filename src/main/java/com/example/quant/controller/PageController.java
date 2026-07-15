@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -46,6 +47,7 @@ public class PageController {
         model.addAttribute("indicators", indicatorPool.allNames());
         model.addAttribute("config", new StrategyConfig());
         model.addAttribute("hasData", dataService.hasData());
+        model.addAttribute("models", analysisService.listModels());
         return "config";
     }
 
@@ -62,6 +64,32 @@ public class PageController {
                 return "redirect:/config";
             }
             analysisService.run(config);
+            return "redirect:/result";
+        } catch (Exception e) {
+            attrs.addFlashAttribute("error", e.getMessage());
+            return "redirect:/config";
+        }
+    }
+
+    /** 用已训练模型对当前数据回测（不重训）：选模型 + 资金/手续费 → 重定向结果页。 */
+    @PostMapping("/backtest-model")
+    public String backtestModel(@RequestParam String modelId,
+                                @RequestParam(defaultValue = "1000000") double initialCapital,
+                                @RequestParam(defaultValue = "0.0003") double commissionRate,
+                                RedirectAttributes attrs) {
+        try {
+            if (!dataService.hasData()) {
+                attrs.addFlashAttribute("error", "请先上传或加载行情数据");
+                return "redirect:/config";
+            }
+            if (modelId == null || modelId.isBlank()) {
+                attrs.addFlashAttribute("error", "请选择一个已训练模型");
+                return "redirect:/config";
+            }
+            StrategyConfig cfg = new StrategyConfig();
+            cfg.setInitialCapital(initialCapital);
+            cfg.setCommissionRate(commissionRate);
+            analysisService.backtestWithModel(modelId, cfg);
             return "redirect:/result";
         } catch (Exception e) {
             attrs.addFlashAttribute("error", e.getMessage());

@@ -18,7 +18,7 @@ import java.util.List;
  * @param countHold      预测为 HOLD 的根数
  * @param verifiedCount  标签可得的根数（可计算准确率）
  * @param forwardCount   尾部无法标注、属纯粹向前预测的根数
- * @param accuracy       可验证根上的方向预测准确率 [0,1]；无可验证根为 null
+ * @param accuracy       可验证根上的方向预测准确率 [0,1]（HOLD 匹配中性标签算正确）；无可验证根为 null
  * @param bars           逐根预测明细
  */
 public record PredictionResult(

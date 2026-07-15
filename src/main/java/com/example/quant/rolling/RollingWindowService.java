@@ -6,6 +6,7 @@ import com.example.quant.model.Chromosome;
 import com.example.quant.model.KLine;
 import com.example.quant.model.Signal;
 import com.example.quant.model.StrategyConfig;
+import com.example.quant.model.TimingLabel;
 import com.example.quant.model.WindowResult;
 import com.example.quant.strategy.SignalGenerator;
 import org.slf4j.Logger;
@@ -81,14 +82,19 @@ public class RollingWindowService {
             double[][][] trainCache = signalGenerator.precomputeScores(indicators, trainKlines);
             Chromosome best = geneticAlgorithm.evolve(indicators, trainKlines, trainCache, config);
 
-            // 训练准确率：模型在训练集上的择时方向预测准确率（可验证性）
+            // 训练准确率：模型在训练集上的择时方向预测准确率（可验证性）；表态率伴生展示
             double trainAcc = fitnessEvaluator.accuracy(best, indicators.size(), trainKlines, trainCache, config);
+            double trainCommit = fitnessEvaluator.commitmentRate(best, indicators.size(), trainKlines, trainCache, config);
 
-            double[][][] predictCache = signalGenerator.precomputeScores(indicators, predictKlines);
+            // 预测窗指标需携带训练窗历史：指标（MA/RSI/MACD…）有 lookback，仅在预测窗短 klines 上从头算
+            // 会导致前 period-1 根全 NaN→评分 0→强制 HOLD，预测窗几乎不发出信号。
+            // 拼接 train+predict 后算指标再切片取预测段：指标因果，无未来信息泄露，且训练段切片值与原逐窗计算一致。
+            double[][][] predictCache = contextualCache(indicators, trainKlines, predictKlines);
             Signal[] predictSignals = signalGenerator.generate(best, indicators.size(), predictCache);
 
-            // 测试准确率：模型在样本外预测窗口上的方向预测准确率
+            // 测试准确率：模型在样本外预测窗口上的方向预测准确率；表态率伴生展示
             double testAcc = fitnessEvaluator.accuracy(best, indicators.size(), predictKlines, predictCache, config);
+            double testCommit = fitnessEvaluator.commitmentRate(best, indicators.size(), predictKlines, predictCache, config);
 
             for (int i = 0; i < predictKlines.size(); i++) {
                 LocalDate d = predictKlines.get(i).getDate();
@@ -101,10 +107,11 @@ public class RollingWindowService {
                     predictKlines.get(0).getDate(), predictKlines.get(predictKlines.size() - 1).getDate(),
                     best.getFitness(), trainAcc, testAcc, best));
 
-            log.info("窗口 {}: 训练 {}~{}, 预测 {}~{}, 适应度={}, 训练准确率={}, 测试准确率={}",
+            log.info("窗口 {}: 训练 {}~{}, 预测 {}~{}, 适应度={}, 训练准确率={}, 训练表态率={}, 测试准确率={}, 测试表态率={}",
                     windows.size(), trainStart, trainEnd, predictStart, predictEnd,
                     String.format("%.4f", best.getFitness()),
-                    String.format("%.4f", trainAcc), String.format("%.4f", testAcc));
+                    String.format("%.4f", trainAcc), String.format("%.4f", trainCommit),
+                    String.format("%.4f", testAcc), String.format("%.4f", testCommit));
         }
 
         if (outOfSampleDates.isEmpty()) {
@@ -117,7 +124,18 @@ public class RollingWindowService {
         for (KLine k : outKlines) {
             optimizedSignals[idx++] = outOfSampleSignals.get(k.getDate());
         }
-        return new RollingResult(outKlines, optimizedSignals, windows);
+
+        // pooled 样本外准确率：跨所有窗口聚合的样本外信号上的方向预测准确率（可验证性主数字）。
+        // 单窗口 testAcc 因 predictMonths=1 样本量小而噪声大（易出现 0.0000），pooled 才是稳定可验证值。
+        double pooledThreshold = TimingLabel.adaptiveThreshold(outKlines, config.getForecastDays(), config.getLabelThreshold());
+        double pooledAcc = TimingLabel.directionalAccuracy(optimizedSignals, outKlines, config.getForecastDays(), pooledThreshold);
+        double pooledCommit = TimingLabel.commitmentRate(optimizedSignals, outKlines, config.getForecastDays());
+        log.info("样本外汇总：{} 根，pooled 准确率={}, pooled 表态率={}",
+                outKlines.size(),
+                Double.isNaN(pooledAcc) ? "N/A" : String.format("%.4f", pooledAcc),
+                Double.isNaN(pooledCommit) ? "N/A" : String.format("%.4f", pooledCommit));
+
+        return new RollingResult(outKlines, optimizedSignals, windows, pooledAcc, pooledCommit);
     }
 
     private List<YearMonth> sortedMonths(List<KLine> klines) {
@@ -144,7 +162,20 @@ public class RollingWindowService {
         return out;
     }
 
-    /** 滚动结果：样本外 K 线、优化策略信号、各窗口记录。 */
+    /**
+     * 带 train 历史上下文计算预测窗指标评分，再切片取预测段。
+     * 避免 lookback 指标在短预测窗上冷启动（前 period-1 根 NaN→0→HOLD）导致预测窗几乎不发出信号。
+     */
+    private double[][][] contextualCache(List<com.example.quant.indicator.Indicator> indicators,
+                                         List<KLine> trainKlines, List<KLine> predictKlines) {
+        List<KLine> ctx = new ArrayList<>(trainKlines.size() + predictKlines.size());
+        ctx.addAll(trainKlines);
+        ctx.addAll(predictKlines);
+        double[][][] full = signalGenerator.precomputeScores(indicators, ctx);
+        return SignalGenerator.sliceBars(full, trainKlines.size(), ctx.size());
+    }
+
+    /** 滚动结果：样本外 K 线、优化策略信号、各窗口记录、pooled 样本外准确率与表态率。 */
     public record RollingResult(List<KLine> outOfSampleKlines, Signal[] optimizedSignals,
-                                List<WindowResult> windows) {}
+                                List<WindowResult> windows, double pooledAccuracy, double pooledCommitment) {}
 }

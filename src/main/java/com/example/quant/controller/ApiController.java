@@ -130,15 +130,42 @@ public class ApiController {
         return ResponseEntity.ok(summary);
     }
 
+    /** 列出全部已落盘训练模型（按训练时间倒序），用于选择复用。 */
+    @GetMapping("/api/models")
+    public List<?> models() {
+        return analysisService.listModels();
+    }
+
     /**
-     * 预测入口：加载已训练择时模型（按 {@code model} 指定的数据名，对应训练时落盘的模型文件），
+     * 用已训练模型对当前数据回测（不重训）：加载模型 → 当前数据生成信号 → 标准化回测。
+     * 可选 JSON body 传 StrategyConfig（仅用 initialCapital/commissionRate，指标取自模型）。
+     */
+    @PostMapping("/api/backtest-model")
+    public ResponseEntity<?> backtestModel(@RequestParam String model,
+                                           @RequestBody(required = false) StrategyConfig config) {
+        if (model == null || model.isBlank()) {
+            return badRequest("缺少 model 参数（模型 id，可通过 /api/models 获取）");
+        }
+        if (!dataService.hasData()) {
+            return badRequest("请先上传或加载行情数据");
+        }
+        try {
+            StrategyConfig cfg = config != null ? config : new StrategyConfig();
+            return ResponseEntity.ok(analysisService.backtestWithModel(model, cfg));
+        } catch (Exception e) {
+            return badRequest("模型回测失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 预测入口：加载已训练择时模型（按 {@code model} 指定的模型 id，可由 {@code GET /api/models} 获取），
      * 对当前上传/加载的数据逐根生成 BUY/SELL/HOLD 方向预测，并在标签可得的根上给出准确率。
      * <p>典型流程：先 {@code POST /api/train} 训练并落盘模型 → 上传新数据 → 调本接口预测。
      */
     @PostMapping("/api/predict")
     public ResponseEntity<?> predict(@RequestParam String model) {
         if (model == null || model.isBlank()) {
-            return badRequest("缺少 model 参数（训练时使用的数据名）");
+            return badRequest("缺少 model 参数（模型 id，可通过 /api/models 获取）");
         }
         if (!dataService.hasData()) {
             return badRequest("请先上传或加载行情数据");
@@ -163,15 +190,18 @@ public class ApiController {
     /**
      * 文件夹批量训练：对 {@code path} 指向的文件夹内每个 CSV（一个标的）逐个训练择时模型。
      * 可选 JSON body 传 StrategyConfig；不传则用默认配置（启用全部指标）。
+     * <p>{@code suffix} 后缀筛选（默认 {@code _daily_hfq.csv}）：当一只股票目录下有日/周/月 ×
+     * 多种复权的多个 CSV 时，只训练匹配后缀的那一个，实现「一只股票一个模型」。传空串则训练全部 CSV。
      */
     @PostMapping("/api/train-folder")
     public ResponseEntity<?> trainFolder(@RequestParam String path,
+                                         @RequestParam(defaultValue = "_daily_hfq.csv") String suffix,
                                          @RequestBody(required = false) StrategyConfig config) {
         if (path == null || path.isBlank()) {
             return badRequest("缺少 path 参数（文件夹路径）");
         }
         try {
-            return ResponseEntity.ok(analysisService.trainFolder(Path.of(path), config));
+            return ResponseEntity.ok(analysisService.trainFolder(Path.of(path), config, suffix));
         } catch (Exception e) {
             return badRequest("批量训练失败：" + e.getMessage());
         }
