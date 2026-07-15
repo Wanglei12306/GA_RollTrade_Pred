@@ -17,10 +17,14 @@ function render(report) {
   document.getElementById("content").style.display = "";
   const opt = report.optimized;
   const fix = report.fixed;
-  document.getElementById("subTitle").textContent =
-    `数据：${report.dataName} · 滚动窗口 ${report.windows.length} 个 · 样本外 ${report.outOfSampleKlines.length} 根`;
+  const singleModel = !report.windows || report.windows.length === 0;
+  document.getElementById("subTitle").textContent = singleModel
+    ? `数据：${report.dataName} · 单模型回测 · ${report.outOfSampleKlines.length} 根`
+    : `数据：${report.dataName} · 滚动窗口 ${report.windows.length} 个 · 样本外 ${report.outOfSampleKlines.length} 根`;
 
   const m = opt.metrics;
+  const dirAcc = report.directionalAccuracy;
+  const commit = report.commitmentRate;
   document.getElementById("metricGrid").innerHTML = [
     metric("累计收益", pct(m.cumulativeReturn), cls(m.cumulativeReturn)),
     metric("年化收益", pct(m.annualReturn), cls(m.annualReturn)),
@@ -29,7 +33,9 @@ function render(report) {
     metric("胜率", pct(m.winRate)),
     metric("盈亏比", num(m.profitLossRatio, 2)),
     metric("交易次数", m.tradeCount),
-    metric("买入持有", pct(m.buyHoldReturn), cls(m.buyHoldReturn))
+    metric("买入持有", pct(m.buyHoldReturn), cls(m.buyHoldReturn)),
+    metric("方向准确率", dirAcc == null ? "—" : pct(dirAcc), dirAcc == null ? "" : (dirAcc >= 0.5 ? "positive" : "negative")),
+    metric("表态率", commit == null ? "—" : pct(commit))
   ].join("");
 
   renderPrice(report);
@@ -123,7 +129,12 @@ function renderTrades(trades) {
 }
 
 function renderWindows(windows) {
-  document.getElementById("windowTbody").innerHTML = windows.map((w, i) =>
+  const tbody = document.getElementById("windowTbody");
+  if (!windows || !windows.length) {
+    tbody.innerHTML = '<tr><td colspan="4">单模型回测，无滚动窗口</td></tr>';
+    return;
+  }
+  tbody.innerHTML = windows.map((w, i) =>
     `<tr><td>${i + 1}</td><td>${w.trainStart} ~ ${w.trainEnd}</td><td>${w.predictStart} ~ ${w.predictEnd}</td><td>${num(w.bestFitness, 4)}</td></tr>`
   ).join("");
 }

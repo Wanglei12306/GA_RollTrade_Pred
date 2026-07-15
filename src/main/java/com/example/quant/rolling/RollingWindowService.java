@@ -172,15 +172,7 @@ public class RollingWindowService {
         ctx.addAll(trainKlines);
         ctx.addAll(predictKlines);
         double[][][] full = signalGenerator.precomputeScores(indicators, ctx);
-        int from = trainKlines.size();
-        double[][][] out = new double[full.length][][];
-        for (int i = 0; i < full.length; i++) {
-            out[i] = new double[full[i].length][];
-            for (int c = 0; c < full[i].length; c++) {
-                out[i][c] = java.util.Arrays.copyOfRange(full[i][c], from, full[i][c].length);
-            }
-        }
-        return out;
+        return SignalGenerator.sliceBars(full, trainKlines.size(), ctx.size());
     }
 
     /** 滚动结果：样本外 K 线、优化策略信号、各窗口记录、pooled 样本外准确率与表态率。 */

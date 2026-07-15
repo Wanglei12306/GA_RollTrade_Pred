@@ -64,7 +64,7 @@
       <section class="panel">
         <div class="panel-head"><div><span class="eyebrow">滚动窗口</span><h3>训练 / 预测 / 步长（月）</h3></div></div>
         <div class="form-grid">
-          <div><label>训练窗口（月）</label><input type="number" name="trainMonths" th:value="${config.trainMonths}" min="1" max="12"></div>
+          <div><label>训练窗口（月）</label><input type="number" name="trainMonths" th:value="${config.trainMonths}" min="1" max="60"></div>
           <div><label>预测窗口（月）</label><input type="number" name="predictMonths" th:value="${config.predictMonths}" min="1" max="6"></div>
           <div><label>滚动步长（月）</label><input type="number" name="stepMonths" th:value="${config.stepMonths}" min="1" max="6"></div>
         </div>
@@ -81,6 +81,31 @@
       <div style="text-align:right;padding:0 4px 24px">
         <button type="submit" class="primary-button" style="min-height:44px;padding:0 28px" th:disabled="${!hasData}">开始回测</button>
       </div>
+    </form>
+
+    <form th:action="@{/backtest-model}" method="post">
+      <section class="panel">
+        <div class="panel-head"><div><span class="eyebrow">复用模型</span><h3>用已训练模型回测当前数据</h3></div></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div>
+              <label>选择已训练模型</label>
+              <select name="modelId" th:disabled="${models == null or models.isEmpty() or !hasData}" style="width:100%">
+                <option value="" th:if="${models == null or models.isEmpty()}">暂无已训练模型</option>
+                <option th:each="m : ${models}" th:value="${m.id}"
+                        th:text="${m.modelName + ' · fitness=' + #numbers.formatDecimal(m.fitness, 1, 4)}">模型</option>
+              </select>
+            </div>
+            <div><label>初始资金</label><input type="number" name="initialCapital" th:value="${config.initialCapital}" min="1000"></div>
+            <div><label>手续费率</label><input type="number" step="0.0001" name="commissionRate" th:value="${config.commissionRate}" min="0" max="0.01"></div>
+          </div>
+          <p class="hint">不重新训练，直接用选定模型对当前数据生成信号并回测。指标取自模型本身，与训练时一致。</p>
+          <div style="text-align:right;padding-top:12px">
+            <button type="submit" class="secondary-button" style="min-height:44px;padding:0 28px"
+                    th:disabled="${models == null or models.isEmpty() or !hasData}">用此模型回测</button>
+          </div>
+        </div>
+      </section>
     </form>
   </main>
 </div>

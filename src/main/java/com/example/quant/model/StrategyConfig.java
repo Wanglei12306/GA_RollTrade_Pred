@@ -31,6 +31,10 @@ public class StrategyConfig {
     private double wWinRate = 0.10;
     private double wProfitLoss = 0.15;
 
+    // —— 防过拟合：训练窗 fit/val 切分的泛化差距惩罚（C1）与活跃指标复杂度惩罚（C2）——
+    private double generalizationPenalty = 0.25;  // λ：|F(fit)-F(val)| 越大越罚，偏好两段都稳的策略
+    private double complexityPenalty = 0.05;      // 活跃指标占比惩罚，偏好简单可泛化策略
+
     // —— 辅助可验证性权重（不驱动训练，仅用于方向预测准确率展示）——
     private double wAccuracy = 0.6;
     private double wReturnWeighted = 0.4;
@@ -79,6 +83,12 @@ public class StrategyConfig {
 
     public double getwProfitLoss() { return wProfitLoss; }
     public void setwProfitLoss(double wProfitLoss) { this.wProfitLoss = wProfitLoss; }
+
+    public double getGeneralizationPenalty() { return generalizationPenalty; }
+    public void setGeneralizationPenalty(double generalizationPenalty) { this.generalizationPenalty = generalizationPenalty; }
+
+    public double getComplexityPenalty() { return complexityPenalty; }
+    public void setComplexityPenalty(double complexityPenalty) { this.complexityPenalty = complexityPenalty; }
 
     public int getForecastDays() { return forecastDays; }
     public void setForecastDays(int forecastDays) { this.forecastDays = forecastDays; }

@@ -80,4 +80,19 @@ public class SignalGenerator {
         if (idx >= candidateCount) return candidateCount - 1;
         return idx;
     }
+
+    /**
+     * 切片缓存 bar 维度 [from, to)：在已预计算的窗口上划分子区间。
+     * 切片复用原始评分序列，保留指标历史（前段 bar 的 lookback 已算入），无冷启动。
+     */
+    public static double[][][] sliceBars(double[][][] cache, int from, int to) {
+        double[][][] out = new double[cache.length][][];
+        for (int i = 0; i < cache.length; i++) {
+            out[i] = new double[cache[i].length][];
+            for (int c = 0; c < cache[i].length; c++) {
+                out[i][c] = java.util.Arrays.copyOfRange(cache[i][c], from, to);
+            }
+        }
+        return out;
+    }
 }

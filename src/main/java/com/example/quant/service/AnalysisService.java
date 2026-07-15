@@ -95,6 +95,7 @@ public class AnalysisService {
                 config.getForecastDays(), config.getLabelThreshold(),
                 indicators.stream().map(Indicator::name).toList());
         java.nio.file.Path modelPath = modelRepository.save(snapshot);
+        String modelId = modelPath.getFileName().toString().replaceFirst("\\.json$", "");
 
         List<Double> trainAccs = new ArrayList<>();
         List<Double> testAccs = new ArrayList<>();
@@ -112,13 +113,15 @@ public class AnalysisService {
                 n > 0 ? sumTrain / n : Double.NaN,
                 n > 0 ? sumTest / n : Double.NaN,
                 finalModel.getFitness(),
+                modelId,
+                snapshot.modelName(),
                 modelPath.toString(),
                 trainAccs, testAccs);
-        log.info("训练完成：{} 个窗口，平均训练准确率={}, 平均测试准确率={}, 模型={}",
+        log.info("训练完成：{} 个窗口，平均训练准确率={}, 平均测试准确率={}, 模型={}（id={}）",
                 n,
                 String.format("%.4f", lastTrainSummary.avgTrainAccuracy()),
                 String.format("%.4f", lastTrainSummary.avgTestAccuracy()),
-                modelPath);
+                snapshot.modelName(), modelId);
         return lastTrainSummary;
     }
 
@@ -128,23 +131,23 @@ public class AnalysisService {
      * 训练一次 → 保存模型 → 后续加载数据即可预测，无需重训。
      * <p>用模型自身保存的指标名列表重建指标集，保证染色体数组与指标顺序与训练时一致。
      *
-     * @param modelName 训练落盘时的数据名（模型文件名主体，如 "标的A.csv"）
+     * @param modelId 模型 id（训练落盘的文件 stem，可由 {@link #listModels()} 获取）
      */
-    public PredictionResult predict(String modelName) {
+    public PredictionResult predict(String modelId) {
         if (!dataService.hasData()) {
             throw new IllegalStateException("请先上传或加载行情数据");
         }
-        TrainedModel model = modelRepository.load(modelName);
+        TrainedModel model = modelRepository.load(modelId);
         if (model == null) {
-            throw new IllegalStateException("未找到模型：" + modelName
-                    + "（请先对该数据调用 /api/train 训练）");
+            throw new IllegalStateException("未找到模型 id：" + modelId
+                    + "（请先调用 /api/train 训练，或通过 /api/models 查看可用模型）");
         }
         Chromosome chr = model.toChromosome();
         var indicators = indicatorPool.selected(model.indicators());
         List<KLine> klines = dataService.getKlines();
 
         log.info("加载模型预测：模型={}（训练于 {}，fitness={}），数据={} {} 根",
-                modelName, model.trainedAt(),
+                model.modelName(), model.trainedAt(),
                 String.format("%.4f", model.fitness()),
                 dataService.getDataName(), klines.size());
 
@@ -197,7 +200,7 @@ public class AnalysisService {
 
         lastPrediction = new PredictionResult(
                 dataService.getDataName(),
-                modelName,
+                model.modelName(),
                 model.trainedAt(),
                 model.forecastDays(),
                 model.fitness(),
@@ -249,8 +252,73 @@ public class AnalysisService {
         List<AnalysisReport.AnnualReturn> annualReturns = annualReturns(optimized);
 
         lastReport = new AnalysisReport(optimized, fixed, rolling.windows(),
-                outKlines, config, dataService.getDataName(), indicatorCurves, annualReturns);
+                outKlines, config, dataService.getDataName(), indicatorCurves, annualReturns,
+                toBoxed(rolling.pooledAccuracy()), toBoxed(rolling.pooledCommitment()));
         return lastReport;
+    }
+
+    /** 列出全部已落盘训练模型（按训练时间倒序），供前端选择复用。 */
+    public List<ModelRepository.ModelInfo> listModels() {
+        return modelRepository.list();
+    }
+
+    /**
+     * 用已训练模型对当前数据回测：<b>不重训</b>。加载模型 → 按其保存的指标重建指标集 →
+     * 在当前数据上生成信号 → 跑优化策略与固定策略回测 → 返回与 {@link #run} 同构的报告。
+     * <p>与 {@link #run}（滚动训练 + 样本外评估）的区别：无 GA、无滚动窗口，整段当前数据即回测区间，
+     * 报告 windows 为空。指标在全量数据上预计算，无短窗冷启动问题。
+     *
+     * @param modelId 模型 id（由 {@link #listModels()} 提供）
+     */
+    public AnalysisReport backtestWithModel(String modelId, StrategyConfig config) {
+        if (!dataService.hasData()) {
+            throw new IllegalStateException("请先上传或加载行情数据");
+        }
+        TrainedModel model = modelRepository.load(modelId);
+        if (model == null) {
+            throw new IllegalStateException("未找到模型 id：" + modelId
+                    + "（请先训练，或通过 /api/models 查看可用模型）");
+        }
+        Chromosome chr = model.toChromosome();
+        var indicators = indicatorPool.selected(model.indicators());
+        List<KLine> klines = dataService.getKlines();
+
+        log.info("用模型回测：模型={}（训练于 {}，fitness={}），数据={} {} 根，不重训",
+                model.modelName(), model.trainedAt(),
+                String.format("%.4f", model.fitness()),
+                dataService.getDataName(), klines.size());
+
+        double[][][] cache = signalGenerator.precomputeScores(indicators, klines);
+        Signal[] optimizedSignals = signalGenerator.generate(chr, indicators.size(), cache);
+        BacktestResult optimized = backtestEngine.run(klines, optimizedSignals, "optimized",
+                config.getInitialCapital(), config.getCommissionRate());
+
+        Signal[] fixedSignals = fixedStrategy.generate(indicators, cache, signalGenerator);
+        BacktestResult fixed = backtestEngine.run(klines, fixedSignals, "fixed",
+                config.getInitialCapital(), config.getCommissionRate());
+
+        List<AnalysisReport.IndicatorCurve> indicatorCurves = new ArrayList<>();
+        for (int i = 0; i < indicators.size(); i++) {
+            indicatorCurves.add(new AnalysisReport.IndicatorCurve(indicators.get(i).name(), cache[i][0]));
+        }
+        List<AnalysisReport.AnnualReturn> annualReturns = annualReturns(optimized);
+
+        // 辅助可验证性：模型信号在当前数据上的方向准确率与表态率（与训练侧 accuracy 口径一致）
+        double threshold = TimingLabel.adaptiveThreshold(klines, model.forecastDays(), model.labelThreshold());
+        Double dirAcc = toBoxed(TimingLabel.directionalAccuracy(optimizedSignals, klines, model.forecastDays(), threshold));
+        Double commit = toBoxed(TimingLabel.commitmentRate(optimizedSignals, klines, model.forecastDays()));
+
+        lastReport = new AnalysisReport(optimized, fixed, List.of(), klines, config,
+                dataService.getDataName(), indicatorCurves, annualReturns, dirAcc, commit);
+        log.info("模型回测完成：优化累计收益={}, 固定累计收益={}",
+                String.format("%.2f%%", optimized.getMetrics().getCumulativeReturn() * 100),
+                String.format("%.2f%%", fixed.getMetrics().getCumulativeReturn() * 100));
+        return lastReport;
+    }
+
+    /** double → Double，NaN 转 null（便于 JSON 序列化与前端判空展示）。 */
+    private static Double toBoxed(double v) {
+        return Double.isNaN(v) ? null : v;
     }
 
     /**
@@ -304,12 +372,27 @@ public class AnalysisService {
      * 避免多个同名 {@code 1d.csv} 在模型落盘时冲突。
      */
     public FolderTrainResult trainFolder(Path folder, StrategyConfig config) {
+        return trainFolder(folder, config, null);
+    }
+
+    /**
+     * 文件夹批量训练：递归遍历 {@code folder} 下所有 {@code .csv}（每个视为一个标的），
+     * 逐个加载并训练择时模型，各自落盘。单个标的失败（数据不足、格式错误等）不中断整体，记为失败项。
+     * <p>支持 {@code suffix} 后缀筛选（如 {@code _daily_hfq.csv}）：当一只股票目录下有日/周/月 ×
+     * 多种复权的多个 CSV 时，只训练匹配后缀的那一个，实现「一只股票一个模型」。
+     * <p>标的命名：CSV 直接位于 {@code folder} 顶层时用文件名（去 .csv）；位于子目录时用
+     * 其所在子目录名（如 {@code 中证1000/159629.SZ/1d.csv} → 标的名 {@code 159629.SZ}），
+     * 避免多个同名 {@code 1d.csv} 在模型落盘时冲突。
+     */
+    public FolderTrainResult trainFolder(Path folder, StrategyConfig config, String suffix) {
         StrategyConfig cfg = normalizeConfig(config);
-        List<Path> csvs = listCsvs(folder);
+        List<Path> csvs = listCsvs(folder, suffix);
         if (csvs.isEmpty()) {
-            throw new IllegalStateException("文件夹内没有 CSV 文件：" + folder);
+            throw new IllegalStateException("文件夹内没有匹配的 CSV 文件：" + folder
+                    + (suffix != null && !suffix.isBlank() ? "（后缀筛选：" + suffix + "）" : ""));
         }
-        log.info("批量训练：{} 个标的，文件夹={}", csvs.size(), folder);
+        log.info("批量训练：{} 个标的，文件夹={}{}", csvs.size(), folder,
+                suffix != null && !suffix.isBlank() ? "，后缀筛选=" + suffix : "");
 
         List<InstrumentTrainResult> items = new ArrayList<>();
         int ok = 0, fail = 0;
@@ -344,15 +427,19 @@ public class AnalysisService {
     /**
      * 递归列出文件夹下全部 CSV（按路径排序，保证批量顺序确定）。
      * 支持两种数据布局：顶层散放 CSV，或「父目录/标的/1d.csv」式嵌套。
+     * {@code suffix} 非空时仅保留文件名以该后缀结尾的 CSV（大小写不敏感）。
      */
-    private List<Path> listCsvs(Path folder) {
+    private List<Path> listCsvs(Path folder, String suffix) {
         if (!Files.isDirectory(folder)) {
             throw new IllegalArgumentException("路径不是文件夹：" + folder);
         }
+        final String suf = suffix == null ? "" : suffix.toLowerCase();
         try (Stream<Path> s = Files.walk(folder)) {
-            return s.filter(p -> p.toString().toLowerCase().endsWith(".csv"))
-                    .sorted()
-                    .toList();
+            return s.filter(p -> {
+                String name = p.getFileName().toString().toLowerCase();
+                if (!name.endsWith(".csv")) return false;
+                return suf.isEmpty() || name.endsWith(suf);
+            }).sorted().toList();
         } catch (IOException e) {
             throw new IllegalStateException("读取文件夹失败：" + e.getMessage(), e);
         }
