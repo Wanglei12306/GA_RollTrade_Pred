@@ -49,7 +49,9 @@ public class CsvLoader {
             Map<String, Integer> headerIndex = new HashMap<>();
             for (int i = 0; i < headerRec.size(); i++) {
                 String h = headerRec.get(i);
-                if (h != null && !h.isBlank()) {
+                if (h == null) continue;
+                h = h.replace("﻿", "").trim();   // 去 UTF-8 BOM 与首尾空白，避免首列名带 BOM 导致别名匹配失败
+                if (!h.isBlank()) {
                     headerMap.put(h, h);
                     headerIndex.putIfAbsent(h, i);
                 }
