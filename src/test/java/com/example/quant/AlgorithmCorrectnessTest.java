@@ -106,6 +106,68 @@ class AlgorithmCorrectnessTest {
     }
 
     @Test
+    void backtestRiskControlsLimitLossAndCloseOpenPosition() {
+        List<KLine> k = new ArrayList<>();
+        // bar0 产生 BUY，bar1 执行买入，bar2 跌破止损线后退出。
+        double[] closes = {100, 100, 90, 80};
+        for (int i = 0; i < closes.length; i++) {
+            k.add(new KLine(LocalDate.of(2024, 2, i + 1), closes[i], closes[i], closes[i], closes[i], 1000));
+        }
+        Signal[] sig = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.HOLD};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, sig, "risk", 1_000_000, 0.0003,
+                0.5, 0.10, 20);
+
+        // 10% 止损应在第三根 bar 退出，期末不应残留仓位。
+        assertEquals(1, result.getMetrics().getTradeCount());
+        assertEquals(2, result.getTrades().size());
+        assertEquals("SELL", result.getTrades().get(1).getDirection());
+        assertEquals(90.0, result.getTrades().get(1).getPrice(), 1e-9);
+        assertTrue(result.getMetrics().getMaxDrawdown() < 0.06,
+                "半仓止损后的回撤不应接近全仓 10%：" + result.getMetrics().getMaxDrawdown());
+    }
+
+    @Test
+    void drawdownBudgetHaltsReentryAfterRiskExit() {
+        List<KLine> k = new ArrayList<>();
+        double[] closes = {100, 100, 120, 120, 90, 80, 70, 60, 60};
+        for (int i = 0; i < closes.length; i++) {
+            double c = closes[i];
+            k.add(new KLine(LocalDate.of(2024, 3, i + 1), c, c, c, c, 1000));
+        }
+        // 风险退出后仍持续发 BUY；风险闸门不应允许再次入场并继续侵蚀净值。
+        Signal[] signals = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.HOLD,
+                Signal.BUY, Signal.BUY, Signal.BUY, Signal.BUY, Signal.BUY};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, signals, "drawdown-budget", 1_000_000, 0.0,
+                1.0, 0.0, 0, 0, 0.25);
+
+        assertEquals(1, result.getMetrics().getTradeCount());
+        assertEquals(0.25, result.getMetrics().getMaxDrawdown(), 1e-9);
+        assertEquals(900_000.0, result.getEquityCurve()[result.getEquityCurve().length - 1], 1e-6);
+    }
+
+    @Test
+    void drawdownCooldownAllowsReentryAfterRecoveryWindow() {
+        List<KLine> k = new ArrayList<>();
+        double[] closes = {100, 100, 75, 75, 75, 100, 150};
+        for (int i = 0; i < closes.length; i++) {
+            double c = closes[i];
+            k.add(new KLine(LocalDate.of(2024, 4, i + 1), c, c, c, c, 1000));
+        }
+        // 首次风险退出后冷却两根，之后允许在恢复阶段重新入场。
+        Signal[] signals = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.BUY,
+                Signal.HOLD, Signal.HOLD, Signal.HOLD};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, signals, "drawdown-cooldown", 1_000_000, 0.0,
+                1.0, 0.0, 0, 0, 0.25, 0, 2);
+
+        assertEquals(2, result.getMetrics().getTradeCount(), "冷却结束后应允许第二次完整交易");
+        assertTrue(result.getEquityCurve()[result.getEquityCurve().length - 1] > 1_000_000,
+                "恢复阶段重新入场后应能捕获后续上涨");
+    }
+
+    @Test
     void rollingWindowStrictTimeIsolation() {
         List<KLine> k = synthetic(200, 50);   // 约 10 个月日线
         SignalGenerator gen = new SignalGenerator();

@@ -233,9 +233,15 @@ public class AnalysisService {
         Signal[] fixedSignals = fixedStrategy.generate(indicators, outCache, signalGenerator);
 
         BacktestResult optimized = backtestEngine.run(outKlines, optimizedSignals, "optimized",
-                config.getInitialCapital(), config.getCommissionRate());
+                config.getInitialCapital(), config.getCommissionRate(),
+                config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
+                config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
+                config.getDrawdownCooldownBars());
         BacktestResult fixed = backtestEngine.run(outKlines, fixedSignals, "fixed",
-                config.getInitialCapital(), config.getCommissionRate());
+                config.getInitialCapital(), config.getCommissionRate(),
+                config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
+                config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
+                config.getDrawdownCooldownBars());
 
         log.info("回测完成：优化策略累计收益={}, 固定策略累计收益={}",
                 String.format("%.2f%%", optimized.getMetrics().getCumulativeReturn() * 100),
@@ -291,11 +297,17 @@ public class AnalysisService {
         double[][][] cache = signalGenerator.precomputeScores(indicators, klines);
         Signal[] optimizedSignals = signalGenerator.generate(chr, indicators.size(), cache);
         BacktestResult optimized = backtestEngine.run(klines, optimizedSignals, "optimized",
-                config.getInitialCapital(), config.getCommissionRate());
+                config.getInitialCapital(), config.getCommissionRate(),
+                config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
+                config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
+                config.getDrawdownCooldownBars());
 
         Signal[] fixedSignals = fixedStrategy.generate(indicators, cache, signalGenerator);
         BacktestResult fixed = backtestEngine.run(klines, fixedSignals, "fixed",
-                config.getInitialCapital(), config.getCommissionRate());
+                config.getInitialCapital(), config.getCommissionRate(),
+                config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
+                config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
+                config.getDrawdownCooldownBars());
 
         List<AnalysisReport.IndicatorCurve> indicatorCurves = new ArrayList<>();
         for (int i = 0; i < indicators.size(); i++) {

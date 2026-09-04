@@ -138,7 +138,7 @@ public class ApiController {
 
     /**
      * 用已训练模型对当前数据回测（不重训）：加载模型 → 当前数据生成信号 → 标准化回测。
-     * 可选 JSON body 传 StrategyConfig（仅用 initialCapital/commissionRate，指标取自模型）。
+     * 可选 JSON body 传 StrategyConfig（资金、手续费和风控参数，指标取自模型）。
      */
     @PostMapping("/api/backtest-model")
     public ResponseEntity<?> backtestModel(@RequestParam String model,

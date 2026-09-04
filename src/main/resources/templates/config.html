@@ -58,6 +58,9 @@
           <div><label>迭代次数</label><input type="number" name="generations" th:value="${config.generations}" min="10" max="1000"></div>
           <div><label>交叉概率 (0~1)</label><input type="number" step="0.01" name="crossoverRate" th:value="${config.crossoverRate}" min="0" max="1"></div>
           <div><label>变异概率 (0~1)</label><input type="number" step="0.01" name="mutationRate" th:value="${config.mutationRate}" min="0" max="1"></div>
+          <div><label>验证段权重</label><input type="number" step="0.05" name="validationWeight" th:value="${config.validationWeight}" min="0" max="1"></div>
+          <div><label>适应度最小交易数</label><input type="number" name="minTradesForFitness" th:value="${config.minTradesForFitness}" min="1" max="100"></div>
+          <div><label>换手惩罚</label><input type="number" step="0.01" name="turnoverPenalty" th:value="${config.turnoverPenalty}" min="0" max="1"></div>
         </div>
       </section>
 
@@ -65,8 +68,8 @@
         <div class="panel-head"><div><span class="eyebrow">滚动窗口</span><h3>训练 / 预测 / 步长（月）</h3></div></div>
         <div class="form-grid">
           <div><label>训练窗口（月）</label><input type="number" name="trainMonths" th:value="${config.trainMonths}" min="1" max="60"></div>
-          <div><label>预测窗口（月）</label><input type="number" name="predictMonths" th:value="${config.predictMonths}" min="1" max="6"></div>
-          <div><label>滚动步长（月）</label><input type="number" name="stepMonths" th:value="${config.stepMonths}" min="1" max="6"></div>
+          <div><label>预测窗口（月）</label><input type="number" name="predictMonths" th:value="${config.predictMonths}" min="1" max="120"></div>
+          <div><label>滚动步长（月）</label><input type="number" name="stepMonths" th:value="${config.stepMonths}" min="1" max="120"></div>
         </div>
       </section>
 
@@ -75,6 +78,13 @@
         <div class="form-grid">
           <div><label>初始资金</label><input type="number" name="initialCapital" th:value="${config.initialCapital}" min="1000"></div>
           <div><label>手续费率</label><input type="number" step="0.0001" name="commissionRate" th:value="${config.commissionRate}" min="0" max="0.01"></div>
+          <div><label>最大仓位比例</label><input type="number" step="0.05" name="maxPositionRatio" th:value="${config.maxPositionRatio}" min="0.05" max="1"></div>
+          <div><label>止损比例</label><input type="number" step="0.01" name="stopLossRatio" th:value="${config.stopLossRatio}" min="0" max="1"></div>
+          <div><label>最长持仓根数</label><input type="number" name="maxHoldingBars" th:value="${config.maxHoldingBars}" min="0" max="1000"></div>
+          <div><label>最短持仓根数</label><input type="number" name="minHoldingBars" th:value="${config.minHoldingBars}" min="0" max="1000"></div>
+          <div><label>最大回撤风险预算</label><input type="number" step="0.01" name="maxDrawdownLimit" th:value="${config.maxDrawdownLimit}" min="0" max="1"></div>
+          <div><label>回撤冷却根数</label><input type="number" name="drawdownCooldownBars" th:value="${config.drawdownCooldownBars}" min="0" max="1000"></div>
+          <div><label>长期趋势过滤根数</label><input type="number" name="trendFilterBars" th:value="${config.trendFilterBars}" min="0" max="2000"></div>
         </div>
       </section>
 
@@ -98,6 +108,13 @@
             </div>
             <div><label>初始资金</label><input type="number" name="initialCapital" th:value="${config.initialCapital}" min="1000"></div>
             <div><label>手续费率</label><input type="number" step="0.0001" name="commissionRate" th:value="${config.commissionRate}" min="0" max="0.01"></div>
+            <div><label>最大仓位比例</label><input type="number" step="0.05" name="maxPositionRatio" th:value="${config.maxPositionRatio}" min="0.05" max="1"></div>
+            <div><label>止损比例</label><input type="number" step="0.01" name="stopLossRatio" th:value="${config.stopLossRatio}" min="0" max="1"></div>
+            <div><label>最长持仓根数</label><input type="number" name="maxHoldingBars" th:value="${config.maxHoldingBars}" min="0" max="1000"></div>
+            <div><label>最短持仓根数</label><input type="number" name="minHoldingBars" th:value="${config.minHoldingBars}" min="0" max="1000"></div>
+            <div><label>最大回撤风险预算</label><input type="number" step="0.01" name="maxDrawdownLimit" th:value="${config.maxDrawdownLimit}" min="0" max="1"></div>
+            <div><label>回撤冷却根数</label><input type="number" name="drawdownCooldownBars" th:value="${config.drawdownCooldownBars}" min="0" max="1000"></div>
+            <div><label>长期趋势过滤根数</label><input type="number" name="trendFilterBars" th:value="${config.trendFilterBars}" min="0" max="2000"></div>
           </div>
           <p class="hint">不重新训练，直接用选定模型对当前数据生成信号并回测。指标取自模型本身，与训练时一致。</p>
           <div style="text-align:right;padding-top:12px">

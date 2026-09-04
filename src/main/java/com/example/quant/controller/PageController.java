@@ -76,6 +76,13 @@ public class PageController {
     public String backtestModel(@RequestParam String modelId,
                                 @RequestParam(defaultValue = "1000000") double initialCapital,
                                 @RequestParam(defaultValue = "0.0003") double commissionRate,
+                                @RequestParam(defaultValue = "0.6") double maxPositionRatio,
+                                @RequestParam(defaultValue = "0.10") double stopLossRatio,
+                                @RequestParam(defaultValue = "60") int maxHoldingBars,
+                                @RequestParam(defaultValue = "3") int minHoldingBars,
+                                @RequestParam(defaultValue = "0.25") double maxDrawdownLimit,
+                                @RequestParam(defaultValue = "30") int drawdownCooldownBars,
+                                @RequestParam(defaultValue = "120") int trendFilterBars,
                                 RedirectAttributes attrs) {
         try {
             if (!dataService.hasData()) {
@@ -89,6 +96,13 @@ public class PageController {
             StrategyConfig cfg = new StrategyConfig();
             cfg.setInitialCapital(initialCapital);
             cfg.setCommissionRate(commissionRate);
+            cfg.setMaxPositionRatio(maxPositionRatio);
+            cfg.setStopLossRatio(stopLossRatio);
+            cfg.setMaxHoldingBars(maxHoldingBars);
+            cfg.setMinHoldingBars(minHoldingBars);
+            cfg.setMaxDrawdownLimit(maxDrawdownLimit);
+            cfg.setDrawdownCooldownBars(drawdownCooldownBars);
+            cfg.setTrendFilterBars(trendFilterBars);
             analysisService.backtestWithModel(modelId, cfg);
             return "redirect:/result";
         } catch (Exception e) {

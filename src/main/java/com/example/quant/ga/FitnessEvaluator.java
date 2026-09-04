@@ -22,9 +22,10 @@ import java.util.List;
  * <ul>
  *   <li>B1 软饱和归一化：各维度用 {@code x/(|x|+k)} 软饱和替代硬 clip，顶端保留梯度，
  *       避免短窗高收益把适应度顶到 0.9999 失去区分度。</li>
- *   <li>C1 fit/val 切分 + 泛化差距惩罚：训练窗等分两段，{@code 0.5*F(fit)+0.5*F(val)-λ*|F(fit)-F(val)|}，
- *       直接惩罚样本内爆表而验证段拉胯的过拟合个体；切片复用全窗缓存保留指标历史，无冷启动。</li>
+ *   <li>C1 fit/val 切分 + 泛化差距惩罚：验证段权重默认高于训练段，并惩罚两段差距，
+ *       直接压低样本内爆表而验证段拉胯的过拟合个体；切片复用全窗缓存保留指标历史，无冷启动。</li>
  *   <li>C2 复杂度正则：减 {@code complexityPenalty * 活跃指标占比}，偏好简单可泛化策略。</li>
+ *   <li>C3 换手正则：对超过每 30 根 K 线 1 次完整交易的个体扣分，降低手续费和信号噪声。</li>
  *   <li>无完整交易（tradeCount &lt; 1，全 HOLD）→ {@value #NO_TRADE_PENALTY}，引导算法探索主动交易策略。</li>
  * </ul>
  * <p>另提供 {@link #accuracy} 作为<b>辅助可验证性指标</b>（未来 N 日涨跌方向预测准确率），
@@ -75,7 +76,9 @@ public class FitnessEvaluator {
 
         double gap = Math.abs(fitF - valF);
         double complexity = config.getComplexityPenalty() * activeRatio(chr, indicators.size());
-        return 0.5 * fitF + 0.5 * valF - config.getGeneralizationPenalty() * gap - complexity;
+        double validationWeight = clamp(config.getValidationWeight(), 0.0, 1.0);
+        double robust = (1.0 - validationWeight) * fitF + validationWeight * valF;
+        return robust - config.getGeneralizationPenalty() * gap - complexity;
     }
 
     /** 整窗评估（窗口过短的回退路径）：五维软饱和得分减复杂度惩罚。 */
@@ -95,26 +98,36 @@ public class FitnessEvaluator {
                              List<KLine> klines, double[][][] cache, StrategyConfig config) {
         Signal[] signals = signalGenerator.generate(chr, indicators.size(), cache);
         var result = backtestEngine.run(klines, signals, "train",
-                config.getInitialCapital(), config.getCommissionRate());
+                config.getInitialCapital(), config.getCommissionRate(),
+                config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
+                config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
+                config.getDrawdownCooldownBars());
         PerformanceMetrics m = result.getMetrics();
         if (m.getTradeCount() < 1) return NO_TRADE_PENALTY;
 
         double rScore  = softSat(m.getAnnualReturn(), 0.5);
-        double ddScore = 1 - Math.min(m.getMaxDrawdown(), 1);
+        double dd = Math.min(m.getMaxDrawdown(), 1);
+        double duration = klines.size() > 1
+                ? Math.min(1.0, (double) m.getMaxDrawdownDuration() / (klines.size() - 1)) : 0;
+        // 同样的回撤幅度，持续越久风险越高；仍归入回撤维度，保持五维目标不变。
+        double ddScore = (1 - dd) * (1 - 0.5 * duration);
         double shScore = softSat(m.getSharpe(), 2.0);
         double wrScore = m.getWinRate();
         double plScore = softSat(m.getProfitLossRatio(), 2.0);
 
-        double acc = accuracy(chr, indicators.size(), klines, cache, config);
-        if (Double.isNaN(acc)) acc = 0.5; // 无法计算时给个中性分
-        double accScore = acc;
-
-        return config.getwReturn() * rScore
+        // 交易样本过少时向 0 收缩，防止单笔偶然盈利主导遗传选择。
+        double raw = config.getwReturn() * rScore
                 + config.getwDrawdown() * ddScore
                 + config.getwSharpe() * shScore
                 + config.getwWinRate() * wrScore
-                + config.getwProfitLoss() * plScore
-                + config.getwAcc() * accScore;
+                + config.getwProfitLoss() * plScore;
+        int minTrades = Math.max(1, config.getMinTradesForFitness());
+        double confidence = Math.min(1.0, (double) m.getTradeCount() / minTrades);
+        // 以每 30 根 K 线 1 次完整交易作为中性换手水平；过高换手会放大手续费、滑点和噪声。
+        double expectedTrades = Math.max(1.0, klines.size() / 30.0);
+        double turnover = Math.min(1.0, m.getTradeCount() / expectedTrades);
+        double turnoverCost = Math.max(0.0, config.getTurnoverPenalty()) * turnover;
+        return raw * confidence - turnoverCost;
     }
 
     /** 软饱和 x/(|x|+k)：保号、顶端渐近 ±1；NaN→0、+Inf→1、-Inf→-1。 */
