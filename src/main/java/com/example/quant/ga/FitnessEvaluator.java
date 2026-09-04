@@ -72,6 +72,7 @@ public class FitnessEvaluator {
             return NO_TRADE_PENALTY;
         }
 
+
         double gap = Math.abs(fitF - valF);
         double complexity = config.getComplexityPenalty() * activeRatio(chr, indicators.size());
         return 0.5 * fitF + 0.5 * valF - config.getGeneralizationPenalty() * gap - complexity;
@@ -104,11 +105,16 @@ public class FitnessEvaluator {
         double wrScore = m.getWinRate();
         double plScore = softSat(m.getProfitLossRatio(), 2.0);
 
+        double acc = accuracy(chr, indicators.size(), klines, cache, config);
+        if (Double.isNaN(acc)) acc = 0.5; // 无法计算时给个中性分
+        double accScore = acc;
+
         return config.getwReturn() * rScore
                 + config.getwDrawdown() * ddScore
                 + config.getwSharpe() * shScore
                 + config.getwWinRate() * wrScore
-                + config.getwProfitLoss() * plScore;
+                + config.getwProfitLoss() * plScore
+                + config.getwAcc() * accScore;
     }
 
     /** 软饱和 x/(|x|+k)：保号、顶端渐近 ±1；NaN→0、+Inf→1、-Inf→-1。 */

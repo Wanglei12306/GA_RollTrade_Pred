@@ -25,11 +25,12 @@ public class StrategyConfig {
     private double labelThreshold = 0.0;   // 涨跌中性带，|未来收益| <= 该值视为中性(0)
 
     // —— 训练适应度权重：五维盈亏综合（驱动 GA 寻优，见 FitnessEvaluator）——
-    private double wReturn = 0.30;
-    private double wDrawdown = 0.25;
+    private double wReturn = 0.05;
+    private double wDrawdown = 0.3;
     private double wSharpe = 0.20;
     private double wWinRate = 0.10;
     private double wProfitLoss = 0.15;
+    private double wAcc =0.2;
 
     // —— 防过拟合：训练窗 fit/val 切分的泛化差距惩罚（C1）与活跃指标复杂度惩罚（C2）——
     private double generalizationPenalty = 0.25;  // λ：|F(fit)-F(val)| 越大越罚，偏好两段都稳的策略
@@ -101,4 +102,6 @@ public class StrategyConfig {
 
     public double getwReturnWeighted() { return wReturnWeighted; }
     public void setwReturnWeighted(double wReturnWeighted) { this.wReturnWeighted = wReturnWeighted; }
+
+    public double getwAcc() {return wAcc;}
 }
