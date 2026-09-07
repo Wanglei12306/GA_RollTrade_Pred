@@ -44,11 +44,10 @@ public class MacdIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
+            // 连续柱状强度：HIST 相对价格的归一化，0.1% 半饱和。
             double hist = dif[i] - dea[i];
-            double ref = close[i] * 0.001;
-            if (hist > ref) score[i] = 1;
-            else if (hist < -ref) score[i] = -1;
-            else score[i] = 0;
+            double ref = Math.max(close[i], 1e-9);
+            score[i] = IndicatorMath.grade(hist / ref, 0.001);
         }
         return score;
     }

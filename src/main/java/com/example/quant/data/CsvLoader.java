@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -38,13 +39,16 @@ public class CsvLoader {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
              CSVParser parser = new CSVParser(reader, FORMAT)) {
 
-            List<CSVRecord> records = parser.getRecords();
-            if (records.isEmpty()) {
+            // Iterate records directly. parser.getRecords() duplicates the complete
+            // file in memory before KLine objects are created, which is prohibitive
+            // for large intraday exports.
+            Iterator<CSVRecord> records = parser.iterator();
+            if (!records.hasNext()) {
                 throw new DataValidationException("上传文件不能为空");
             }
 
             // 首行作为表头，建立 名称→列索引 映射
-            CSVRecord headerRec = records.get(0);
+            CSVRecord headerRec = records.next();
             Map<String, String> headerMap = new HashMap<>();
             Map<String, Integer> headerIndex = new HashMap<>();
             for (int i = 0; i < headerRec.size(); i++) {
@@ -66,8 +70,10 @@ public class CsvLoader {
             String volCol = DataValidator.findHeader(headerMap, DataValidator.volumeAliases());
 
             LocalDate lastDate = null;
-            for (int r = 1; r < records.size(); r++) {
-                CSVRecord rec = records.get(r);
+            int rowNumber = 1;
+            while (records.hasNext()) {
+                CSVRecord rec = records.next();
+                rowNumber++;
                 if (rec.size() == 0 || (rec.size() == 1 && rec.get(0).isBlank())) continue;
 
                 LocalDate date = DataValidator.parseDate(getByHeader(rec, headerIndex, dateCol));
@@ -82,7 +88,7 @@ public class CsvLoader {
 
                 if (lastDate != null && date.isBefore(lastDate)) {
                     throw new DataValidationException(
-                            "数据未按时间升序排列，第 " + (r + 1) + " 行日期 " + date + " 早于前一行 " + lastDate);
+                            "数据未按时间升序排列，第 " + rowNumber + " 行日期 " + date + " 早于前一行 " + lastDate);
                 }
                 lastDate = date;
                 klines.add(new KLine(date, open, high, low, close, volume));

@@ -37,10 +37,9 @@ public class MaIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
+            // 连续趋势强度：收盘价相对均线的百分比偏离，1% 半饱和。
             double ratio = (close[i] - ma[i]) / ma[i];
-            if (ratio > 0.002) score[i] = 1;
-            else if (ratio < -0.002) score[i] = -1;
-            else score[i] = 0;
+            score[i] = IndicatorMath.grade(ratio, 0.01);
         }
         return score;
     }

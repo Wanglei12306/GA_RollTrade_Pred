@@ -56,9 +56,8 @@ public class RsiIndicator implements Indicator {
         double[] score = new double[n];
         for (int i = 0; i < n; i++) {
             double v = (i >= period) ? rsi[i] : 50;   // 预热段视为中性
-            if (v < 30) score[i] = 1;
-            else if (v > 70) score[i] = -1;
-            else score[i] = 0;
+            // 连续均值回归：RSI 偏离 50 越远信号越强，30→+0.66（超卖偏多）、70→-0.66（超买偏空）。
+            score[i] = IndicatorMath.grade(50 - v, 25);
         }
         return score;
     }

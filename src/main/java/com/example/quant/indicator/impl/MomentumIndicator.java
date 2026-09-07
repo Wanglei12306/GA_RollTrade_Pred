@@ -43,9 +43,8 @@ public class MomentumIndicator implements Indicator {
                 continue;
             }
             double roc = close[i] / prev - 1;
-            if (roc > 0) score[i] = 1;
-            else if (roc < 0) score[i] = -1;
-            else score[i] = 0;
+            // 连续动量：ROC 的百分比变化率，3% 半饱和（正动量看多、负动量看空）。
+            score[i] = IndicatorMath.grade(roc, 0.03);
         }
         return score;
     }

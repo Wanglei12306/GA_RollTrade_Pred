@@ -3,16 +3,16 @@ package com.example.quant.model;
 import java.time.LocalDate;
 
 /**
- * 逐笔交易记录（一次买或卖）。
+ * 逐笔交易记录（BUY/SELL 多头，SHORT/COVER 空头）。
  */
 public class TradeRecord {
 
     private final LocalDate time;
-    private final String direction;   // BUY / SELL
+    private final String direction;   // BUY / SELL / SHORT / COVER
     private final double price;
     private final double quantity;
     private final double commission;
-    private final double pnl;         // 本笔平仓时实现的盈亏（买入为 0）
+    private final double pnl;         // 本笔平仓时实现的盈亏（开仓为 0）
     private final double positionAfter;
 
     public TradeRecord(LocalDate time, String direction, double price, double quantity,

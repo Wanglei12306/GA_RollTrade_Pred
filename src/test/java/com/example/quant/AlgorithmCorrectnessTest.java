@@ -106,6 +106,87 @@ class AlgorithmCorrectnessTest {
     }
 
     @Test
+    void backtestRiskControlsLimitLossAndCloseOpenPosition() {
+        List<KLine> k = new ArrayList<>();
+        // bar0 产生 BUY，bar1 执行买入，bar2 跌破止损线后退出。
+        double[] closes = {100, 100, 90, 80};
+        for (int i = 0; i < closes.length; i++) {
+            k.add(new KLine(LocalDate.of(2024, 2, i + 1), closes[i], closes[i], closes[i], closes[i], 1000));
+        }
+        Signal[] sig = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.HOLD};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, sig, "risk", 1_000_000, 0.0003,
+                0.5, 0.10, 20);
+
+        // 10% 止损应在第三根 bar 退出，期末不应残留仓位。
+        assertEquals(1, result.getMetrics().getTradeCount());
+        assertEquals(2, result.getTrades().size());
+        assertEquals("SELL", result.getTrades().get(1).getDirection());
+        assertEquals(90.0, result.getTrades().get(1).getPrice(), 1e-9);
+        assertTrue(result.getMetrics().getMaxDrawdown() < 0.06,
+                "半仓止损后的回撤不应接近全仓 10%：" + result.getMetrics().getMaxDrawdown());
+    }
+
+    @Test
+    void drawdownBudgetHaltsReentryAfterRiskExit() {
+        List<KLine> k = new ArrayList<>();
+        double[] closes = {100, 100, 120, 120, 90, 80, 70, 60, 60};
+        for (int i = 0; i < closes.length; i++) {
+            double c = closes[i];
+            k.add(new KLine(LocalDate.of(2024, 3, i + 1), c, c, c, c, 1000));
+        }
+        // 风险退出后仍持续发 BUY；风险闸门不应允许再次入场并继续侵蚀净值。
+        Signal[] signals = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.HOLD,
+                Signal.BUY, Signal.BUY, Signal.BUY, Signal.BUY, Signal.BUY};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, signals, "drawdown-budget", 1_000_000, 0.0,
+                1.0, 0.0, 0, 0, 0.25);
+
+        assertEquals(1, result.getMetrics().getTradeCount());
+        assertEquals(0.25, result.getMetrics().getMaxDrawdown(), 1e-9);
+        assertEquals(900_000.0, result.getEquityCurve()[result.getEquityCurve().length - 1], 1e-6);
+    }
+
+    @Test
+    void drawdownCooldownAllowsReentryAfterRecoveryWindow() {
+        List<KLine> k = new ArrayList<>();
+        double[] closes = {100, 100, 75, 75, 75, 100, 150};
+        for (int i = 0; i < closes.length; i++) {
+            double c = closes[i];
+            k.add(new KLine(LocalDate.of(2024, 4, i + 1), c, c, c, c, 1000));
+        }
+        // 首次风险退出后冷却两根，之后允许在恢复阶段重新入场。
+        Signal[] signals = {Signal.BUY, Signal.HOLD, Signal.HOLD, Signal.BUY,
+                Signal.HOLD, Signal.HOLD, Signal.HOLD};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, signals, "drawdown-cooldown", 1_000_000, 0.0,
+                1.0, 0.0, 0, 0, 0.25, 0, 2);
+
+        assertEquals(2, result.getMetrics().getTradeCount(), "冷却结束后应允许第二次完整交易");
+        assertTrue(result.getEquityCurve()[result.getEquityCurve().length - 1] > 1_000_000,
+                "恢复阶段重新入场后应能捕获后续上涨");
+    }
+
+    @Test
+    void longShortBacktestProfitsFromDecline() {
+        List<KLine> k = new ArrayList<>();
+        double[] closes = {100, 100, 90, 80, 70};
+        for (int i = 0; i < closes.length; i++) {
+            double c = closes[i];
+            k.add(new KLine(LocalDate.of(2024, 5, i + 1), c, c, c, c, 1000));
+        }
+        Signal[] signals = {Signal.SELL, Signal.HOLD, Signal.HOLD, Signal.BUY, Signal.HOLD};
+        BacktestEngine engine = new BacktestEngine(new MetricsCalculator());
+        var result = engine.run(k, signals, "long-short", 1_000_000, 0.0,
+                1.0, 0.0, 0, 0, 0.0, 0, 0, true);
+
+        assertEquals(1, result.getMetrics().getTradeCount());
+        assertEquals(1_300_000.0, result.getEquityCurve()[result.getEquityCurve().length - 1], 1e-6);
+        assertTrue(result.getTrades().stream().anyMatch(t -> "SHORT".equals(t.getDirection())));
+        assertTrue(result.getTrades().stream().anyMatch(t -> "COVER".equals(t.getDirection())));
+    }
+
+    @Test
     void rollingWindowStrictTimeIsolation() {
         List<KLine> k = synthetic(200, 50);   // 约 10 个月日线
         SignalGenerator gen = new SignalGenerator();
@@ -223,6 +304,46 @@ class AlgorithmCorrectnessTest {
         double acc = fe.accuracy(best, indicators.size(), k, cache, cfg);
         assertTrue(Double.isNaN(acc) || (acc >= 0 && acc <= 1),
                 "辅助方向准确率应在 [0,1] 或 NaN：" + acc);
+    }
+
+    @Test
+    void nsga2ObjectivesAndValidChromosome() {
+        List<KLine> k = synthetic(120, 100);
+        SignalGenerator gen = new SignalGenerator();
+        BacktestEngine be = new BacktestEngine(new MetricsCalculator());
+        FitnessEvaluator fe = new FitnessEvaluator(gen, be);
+        var indicators = List.<Indicator>of(new MaIndicator(), new RsiIndicator());
+        double[][][] cache = gen.precomputeScores(indicators, k);
+        StrategyConfig cfg = new StrategyConfig();
+        cfg.setPopulationSize(12);
+        cfg.setGenerations(6);
+
+        // 无交易染色体的双目标应为最差占位，保证被任何真实交易个体支配
+        int n = indicators.size();
+        boolean[] mask = new boolean[n];
+        Arrays.fill(mask, true);
+        int[] pi = new int[n];
+        double[] w = new double[n];
+        Arrays.fill(w, 1.0);
+        Chromosome allHold = new Chromosome(mask, pi, w, 1e9, -1e9);
+        FitnessEvaluator.Objectives noTrade = fe.objectives(allHold, indicators, k, cache, cfg);
+        assertEquals(-1.0, noTrade.returnScore(), 1e-9, "无交易收益目标应为最差 -1");
+        assertEquals(0.0, noTrade.drawdownScore(), 1e-9, "无交易回撤保护目标应为最差 0");
+
+        // NSGA-II 进化出合法染色体
+        GeneticAlgorithm ga = new GeneticAlgorithm(fe);
+        Chromosome best = ga.evolvePareto(indicators, k, cache, cfg);
+        assertTrue(best.selectedCount() >= 1, "染色体至少选中一个指标");
+        assertTrue(best.getBuyThreshold() > 0, "买入阈值应为正");
+        assertTrue(best.getSellThreshold() < 0, "卖出阈值应为负");
+        assertFalse(Double.isNaN(best.getFitness()), "偏好适应度应已计算");
+
+        // 最优个体双目标有限且在合理区间
+        FitnessEvaluator.Objectives bestObj = fe.objectives(best, indicators, k, cache, cfg);
+        assertTrue(Double.isFinite(bestObj.returnScore()), "收益目标应为有限值");
+        assertTrue(Double.isFinite(bestObj.drawdownScore()), "回撤目标应为有限值");
+        assertTrue(bestObj.returnScore() <= 1.0 + 1e-9, "收益目标上界：" + bestObj.returnScore());
+        assertTrue(bestObj.drawdownScore() <= 1.0 + 1e-9, "回撤保护目标上界：" + bestObj.drawdownScore());
     }
 
     @Test

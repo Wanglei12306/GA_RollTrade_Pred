@@ -63,10 +63,8 @@ public class KdjIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
-            int s = k[i] > d[i] ? 1 : (k[i] < d[i] ? -1 : 0);
-            if (j[i] > 100) s = -1;   // 超买偏空
-            if (j[i] < 0) s = 1;       // 超卖偏多
-            score[i] = s;
+            // 连续随机强度：J 值偏离中性 50，超买(>50)偏空、超卖(<50)偏多，硬饱和到 [-1,1]。
+            score[i] = IndicatorMath.clamp01(50 - j[i], 50);
         }
         return score;
     }

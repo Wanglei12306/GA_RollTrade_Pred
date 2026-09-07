@@ -57,9 +57,8 @@ public class CciIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
-            if (cci[i] > 100) score[i] = -1;
-            else if (cci[i] < -100) score[i] = 1;
-            else score[i] = 0;
+            // 连续乖离：CCI 本身已按均值离差归一化，±150 满信号（超买偏空、超卖偏多）。
+            score[i] = IndicatorMath.clamp01(-cci[i], 150);
         }
         return score;
     }

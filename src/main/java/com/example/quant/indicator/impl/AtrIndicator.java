@@ -41,10 +41,9 @@ public class AtrIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
+            // 连续突破强度：单根变化以 ATR 归一化，1 倍 ATR 即满信号（动量突破方向）。
             double change = close[i] - close[i - 1];
-            if (change > atr[i]) score[i] = 1;
-            else if (change < -atr[i]) score[i] = -1;
-            else score[i] = 0;
+            score[i] = IndicatorMath.clamp01(change / atr[i], 1.0);
         }
         return score;
     }

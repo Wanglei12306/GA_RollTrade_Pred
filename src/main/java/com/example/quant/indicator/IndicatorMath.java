@@ -156,4 +156,23 @@ public final class IndicatorMath {
         }
         return out;
     }
+
+    /**
+     * 连续评分：把无界有符号原始值 v 以 scale 为半饱和尺度平滑映射到 (-1,1)。
+     * 用 tanh 保号且处处有梯度，避免离散 {-1,0,+1} 造成的信号稀疏（表态率过低）。
+     * NaN 返回 0。
+     */
+    public static double grade(double v, double scale) {
+        if (Double.isNaN(v)) return 0;
+        if (scale <= 0) return 0;
+        return Math.tanh(v / scale);
+    }
+
+    /** 硬饱和：把 v/scale 截断到 [-1,1]，用于本身有界的振荡类指标（RSI/KDJ/CCI 等）。 */
+    public static double clamp01(double v, double scale) {
+        if (Double.isNaN(v)) return 0;
+        if (scale <= 0) return 0;
+        double x = v / scale;
+        return Math.max(-1.0, Math.min(1.0, x));
+    }
 }

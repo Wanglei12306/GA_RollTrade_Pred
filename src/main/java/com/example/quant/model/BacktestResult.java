@@ -36,10 +36,10 @@ public class BacktestResult {
     public List<TradeRecord> getTrades() { return trades; }
     public List<SignalPoint> getSignals() { return signals; }
 
-    /** 信号点：日期 + 信号类型，用于图表标记。 */
+    /** 信号点：日期 + 信号类型（BUY/SELL/SHORT/COVER），用于图表标记。 */
     public static class SignalPoint {
         private final LocalDate date;
-        private final String signal;   // BUY / SELL
+        private final String signal;   // BUY / SELL / SHORT / COVER
         private final double price;
 
         public SignalPoint(LocalDate date, String signal, double price) {

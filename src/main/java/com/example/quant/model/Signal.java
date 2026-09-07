@@ -1,7 +1,7 @@
 package com.example.quant.model;
 
 /**
- * 交易信号类型（第一版仅做多）。
+ * 交易信号类型。SELL 在多空模式下既可平多，也可在空仓时开空。
  */
 public enum Signal {
     BUY,   // 买入 / 开仓

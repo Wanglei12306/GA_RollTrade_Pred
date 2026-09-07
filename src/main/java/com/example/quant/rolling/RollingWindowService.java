@@ -2,13 +2,19 @@ package com.example.quant.rolling;
 
 import com.example.quant.ga.FitnessEvaluator;
 import com.example.quant.ga.GeneticAlgorithm;
+import com.example.quant.backtest.BacktestEngine;
+import com.example.quant.backtest.MetricsCalculator;
 import com.example.quant.model.Chromosome;
+import com.example.quant.model.BacktestResult;
 import com.example.quant.model.KLine;
+import com.example.quant.model.PerformanceMetrics;
 import com.example.quant.model.Signal;
 import com.example.quant.model.StrategyConfig;
 import com.example.quant.model.TimingLabel;
 import com.example.quant.model.WindowResult;
+import com.example.quant.strategy.FixedStrategy;
 import com.example.quant.strategy.SignalGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -37,12 +43,25 @@ public class RollingWindowService {
     private final GeneticAlgorithm geneticAlgorithm;
     private final SignalGenerator signalGenerator;
     private final FitnessEvaluator fitnessEvaluator;
+    private final FixedStrategy fixedStrategy;
+    private final BacktestEngine backtestEngine;
 
+    /** 兼容无 Spring 的算法测试与调用方。 */
     public RollingWindowService(GeneticAlgorithm geneticAlgorithm, SignalGenerator signalGenerator,
                                 FitnessEvaluator fitnessEvaluator) {
+        this(geneticAlgorithm, signalGenerator, fitnessEvaluator, new FixedStrategy(),
+                new BacktestEngine(new MetricsCalculator()));
+    }
+
+    @Autowired
+    public RollingWindowService(GeneticAlgorithm geneticAlgorithm, SignalGenerator signalGenerator,
+                                FitnessEvaluator fitnessEvaluator, FixedStrategy fixedStrategy,
+                                BacktestEngine backtestEngine) {
         this.geneticAlgorithm = geneticAlgorithm;
         this.signalGenerator = signalGenerator;
         this.fitnessEvaluator = fitnessEvaluator;
+        this.fixedStrategy = fixedStrategy;
+        this.backtestEngine = backtestEngine;
     }
 
     public RollingResult run(List<KLine> klines, List<com.example.quant.indicator.Indicator> indicators,
@@ -64,6 +83,7 @@ public class RollingWindowService {
         Map<LocalDate, KLine> outOfSampleDates = new TreeMap<>();
         Map<LocalDate, Signal> outOfSampleSignals = new LinkedHashMap<>();
         List<WindowResult> windows = new ArrayList<>();
+        List<String> deploymentModes = new ArrayList<>();
 
         for (int start = 0; start + train + predict - 1 < months.size(); start += step) {
             YearMonth trainStart = months.get(start);
@@ -80,7 +100,9 @@ public class RollingWindowService {
             }
 
             double[][][] trainCache = signalGenerator.precomputeScores(indicators, trainKlines);
-            Chromosome best = geneticAlgorithm.evolve(indicators, trainKlines, trainCache, config);
+            Chromosome best = config.isParetoOptimization()
+                    ? geneticAlgorithm.evolvePareto(indicators, trainKlines, trainCache, config)
+                    : geneticAlgorithm.evolve(indicators, trainKlines, trainCache, config);
 
             // 训练准确率：模型在训练集上的择时方向预测准确率（可验证性）；表态率伴生展示
             double trainAcc = fitnessEvaluator.accuracy(best, indicators.size(), trainKlines, trainCache, config);
@@ -90,7 +112,19 @@ public class RollingWindowService {
             // 会导致前 period-1 根全 NaN→评分 0→强制 HOLD，预测窗几乎不发出信号。
             // 拼接 train+predict 后算指标再切片取预测段：指标因果，无未来信息泄露，且训练段切片值与原逐窗计算一致。
             double[][][] predictCache = contextualCache(indicators, trainKlines, predictKlines);
-            Signal[] predictSignals = signalGenerator.generate(best, indicators.size(), predictCache);
+            Signal[] candidateSignals = signalGenerator.generate(best, indicators.size(), predictCache);
+
+            // 用训练窗口最近四分之一做一次“模型 vs 固定基准”验证，再决定是否把候选模型外推。
+            // 这一步不读取预测窗口数据，仍严格保持样本外隔离，但能阻止验证期已经失效的模型继续交易。
+            Signal[] baselineSignals = fixedStrategy.generate(indicators, predictCache, signalGenerator);
+            GateDecision gate = chooseDeploymentSignals(best, candidateSignals, baselineSignals,
+                    trainKlines, trainCache, indicators, config);
+            Signal[] predictSignals = gate.signals();
+            deploymentModes.add(gate.mode());
+            log.info("窗口 {} 部署门控：{}（候选验证分={}, 基准验证分={}）",
+                    windows.size() + 1, gate.mode(),
+                    String.format("%.4f", gate.candidateScore()),
+                    String.format("%.4f", gate.baselineScore()));
 
             // 测试准确率：模型在样本外预测窗口上的方向预测准确率；表态率伴生展示
             double testAcc = fitnessEvaluator.accuracy(best, indicators.size(), predictKlines, predictCache, config);
@@ -135,7 +169,7 @@ public class RollingWindowService {
                 Double.isNaN(pooledAcc) ? "N/A" : String.format("%.4f", pooledAcc),
                 Double.isNaN(pooledCommit) ? "N/A" : String.format("%.4f", pooledCommit));
 
-        return new RollingResult(outKlines, optimizedSignals, windows, pooledAcc, pooledCommit);
+        return new RollingResult(outKlines, optimizedSignals, windows, pooledAcc, pooledCommit, deploymentModes);
     }
 
     private List<YearMonth> sortedMonths(List<KLine> klines) {
@@ -175,7 +209,95 @@ public class RollingWindowService {
         return SignalGenerator.sliceBars(full, trainKlines.size(), ctx.size());
     }
 
+    /**
+     * 验证门控：候选模型必须在训练最近一段有足够交易且不明显亏损，且不能显著落后于固定基准。
+     * 两者都失效时返回全 HOLD，优先保护资金而不是为了“有交易”继续承担负期望收益。
+     */
+    private GateDecision chooseDeploymentSignals(Chromosome candidate,
+                                                  Signal[] candidateSignals,
+                                                  Signal[] baselineSignals,
+                                                  List<KLine> trainKlines,
+                                                  double[][][] trainCache,
+                                                  List<com.example.quant.indicator.Indicator> indicators,
+                                                  StrategyConfig config) {
+        if (!config.isValidationGateEnabled()) return new GateDecision(candidateSignals, "candidate", Double.NaN, Double.NaN);
+
+        // 近期数据对下一预测窗的制度/趋势更有代表性；保留前 75% 作为历史上下文，
+        // 只用最后 25% 做部署门控，避免较早的牛熊阶段稀释当前失效信号。
+        int split = (int) Math.floor(trainKlines.size() * 0.75);
+        if (split < 10 || trainKlines.size() - split < 10) {
+            return new GateDecision(candidateSignals, "candidate-short-window", Double.NaN, Double.NaN);
+        }
+        List<KLine> validationKlines = trainKlines.subList(split, trainKlines.size());
+        double[][][] validationCache = SignalGenerator.sliceBars(trainCache, split, trainKlines.size());
+        Signal[] validationCandidate = signalGenerator.generate(candidate, indicators.size(), validationCache);
+        Signal[] validationBaseline = fixedStrategy.generate(indicators, validationCache, signalGenerator);
+
+        PerformanceMetrics candidateMetrics = validate(validationKlines, validationCandidate, config);
+        PerformanceMetrics baselineMetrics = validate(validationKlines, validationBaseline, config);
+        double candidateScore = deploymentScore(candidateMetrics);
+        double baselineScore = deploymentScore(baselineMetrics);
+
+        boolean candidateUsable = usable(candidateMetrics);
+        boolean baselineUsable = usable(baselineMetrics);
+        double margin = Math.max(0.0, config.getValidationGateMargin());
+        double returnEdge = candidateMetrics.getCumulativeReturn() - baselineMetrics.getCumulativeReturn();
+        // 只要候选模型在验证期确实赚钱，且收益不明显落后基准，就保留其捕捉行情的能力；
+        // 不能因为基准的低波动分数略高，就把所有有收益的模型降级成空仓。
+        boolean positiveReturnCandidate = candidateMetrics.getCumulativeReturn() >= 0
+                && returnEdge >= -0.05 && candidateMetrics.getSharpe() > -1.0;
+        if (candidateUsable && candidateMetrics.getCumulativeReturn() >= 0
+                && (candidateScore + margin >= Math.max(0.0, baselineScore)
+                || positiveReturnCandidate)) {
+            return new GateDecision(candidateSignals, "candidate", candidateScore, baselineScore);
+        }
+        if (baselineUsable && baselineScore > candidateScore) {
+            return new GateDecision(baselineSignals, "baseline", candidateScore, baselineScore);
+        }
+        return new GateDecision(holdSignals(candidateSignals.length), "cash", candidateScore, baselineScore);
+    }
+
+    private PerformanceMetrics validate(List<KLine> klines, Signal[] signals, StrategyConfig config) {
+        BacktestResult result = backtestEngine.run(klines, signals, "validation",
+                config.getInitialCapital(), config.getCommissionRate(), config.getMaxPositionRatio(),
+                config.getStopLossRatio(), config.getMaxHoldingBars(), config.getMinHoldingBars(),
+                config.getMaxDrawdownLimit(), config.getTrendFilterBars(), config.getDrawdownCooldownBars(),
+                config.isAllowShortPositions());
+        return result.getMetrics();
+    }
+
+    private boolean usable(PerformanceMetrics m) {
+        return m.getTradeCount() >= 2 && Double.isFinite(m.getCumulativeReturn())
+                && m.getCumulativeReturn() > -0.15 && Double.isFinite(m.getSharpe())
+                && m.getSharpe() > -1.0;
+    }
+
+    /** 独立于训练适应度的部署评分，强调验证期收益和风险调整收益。 */
+    private double deploymentScore(PerformanceMetrics m) {
+        if (m.getTradeCount() < 1) return -1.0;
+        double ret = softSat(m.getCumulativeReturn(), 0.25);
+        double sharpe = softSat(m.getSharpe(), 1.5);
+        double risk = 1.0 - Math.min(1.0, Math.max(0.0, m.getMaxDrawdown()));
+        double score = 0.55 * ret + 0.30 * sharpe + 0.15 * risk;
+        if (m.getCumulativeReturn() < 0) score -= 0.15 * Math.min(1.0, -m.getCumulativeReturn());
+        return score;
+    }
+
+    private Signal[] holdSignals(int size) {
+        Signal[] out = new Signal[size];
+        java.util.Arrays.fill(out, Signal.HOLD);
+        return out;
+    }
+
+    private static double softSat(double value, double scale) {
+        if (!Double.isFinite(value)) return value > 0 ? 1.0 : -1.0;
+        return value / (Math.abs(value) + scale);
+    }
+
+    private record GateDecision(Signal[] signals, String mode, double candidateScore, double baselineScore) {}
+
     /** 滚动结果：样本外 K 线、优化策略信号、各窗口记录、pooled 样本外准确率与表态率。 */
     public record RollingResult(List<KLine> outOfSampleKlines, Signal[] optimizedSignals,
-                                List<WindowResult> windows, double pooledAccuracy, double pooledCommitment) {}
+                                List<WindowResult> windows, double pooledAccuracy, double pooledCommitment,
+                                List<String> deploymentModes) {}
 }

@@ -48,12 +48,10 @@ public class ObvIndicator implements Indicator {
                 score[i] = 0;
                 continue;
             }
+            // 连续量能：OBV 相对其均线的归一化偏离，1% 半饱和。
             double diff = obv[i] - obvMa[i];
             double scale = Math.abs(obvMa[i]) + 1;
-            double ratio = diff / scale;
-            if (ratio > 0.01) score[i] = 1;
-            else if (ratio < -0.01) score[i] = -1;
-            else score[i] = 0;
+            score[i] = IndicatorMath.grade(diff / scale, 0.01);
         }
         return score;
     }

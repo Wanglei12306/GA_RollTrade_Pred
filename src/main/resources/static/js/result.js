@@ -29,6 +29,7 @@ function render(report) {
     metric("累计收益", pct(m.cumulativeReturn), cls(m.cumulativeReturn)),
     metric("年化收益", pct(m.annualReturn), cls(m.annualReturn)),
     metric("最大回撤", "-" + pct(m.maxDrawdown), "negative"),
+    metric("回撤持续", num(m.maxDrawdownDuration, 0) + " 根"),
     metric("夏普比率", num(m.sharpe, 2)),
     metric("胜率", pct(m.winRate)),
     metric("盈亏比", num(m.profitLossRatio, 2)),
@@ -37,7 +38,6 @@ function render(report) {
     metric("方向准确率", dirAcc == null ? "—" : pct(dirAcc), dirAcc == null ? "" : (dirAcc >= 0.5 ? "positive" : "negative")),
     metric("表态率", commit == null ? "—" : pct(commit))
   ].join("");
-
   renderPrice(report);
   renderIndicators(report);
   renderEquity(opt, fix);
@@ -107,6 +107,7 @@ function renderCompare(m, f) {
     ["累计收益", pct(m.cumulativeReturn), pct(f.cumulativeReturn), pct(m.buyHoldReturn)],
     ["年化收益", pct(m.annualReturn), pct(f.annualReturn), "—"],
     ["最大回撤", "-" + pct(m.maxDrawdown), "-" + pct(f.maxDrawdown), "—"],
+    ["回撤持续根数", num(m.maxDrawdownDuration, 0), num(f.maxDrawdownDuration, 0), "—"],
     ["夏普比率", num(m.sharpe, 2), num(f.sharpe, 2), "—"],
     ["胜率", pct(m.winRate), pct(f.winRate), "—"],
     ["盈亏比", num(m.profitLossRatio, 2), num(f.profitLossRatio, 2), "—"],
@@ -122,7 +123,10 @@ function renderTrades(trades) {
     return;
   }
   document.getElementById("tradeTbody").innerHTML = trades.map(t => {
-    const tag = t.direction === "BUY" ? '<span class="tag buy">买入</span>' : '<span class="tag sell">卖出</span>';
+    const tag = t.direction === "BUY" ? '<span class="tag buy">买入</span>'
+      : t.direction === "SHORT" ? '<span class="tag sell">开空</span>'
+      : t.direction === "COVER" ? '<span class="tag buy">平空</span>'
+      : '<span class="tag sell">卖出</span>';
     const pnl = t.pnl ? `<span class="${cls(t.pnl)}">${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(0)}</span>` : "—";
     return `<tr><td>${t.time}</td><td>${tag}</td><td>${t.price.toFixed(2)}</td><td>${t.quantity.toFixed(0)}</td><td>${t.commission.toFixed(0)}</td><td>${pnl}</td><td>${t.positionAfter.toFixed(0)}</td></tr>`;
   }).join("");
