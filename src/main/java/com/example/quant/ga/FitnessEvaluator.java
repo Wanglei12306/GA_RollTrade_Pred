@@ -112,7 +112,8 @@ public class FitnessEvaluator {
                 config.getInitialCapital(), config.getCommissionRate(),
                 config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
                 config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
-                config.getDrawdownCooldownBars(), config.isAllowShortPositions());
+                config.getDrawdownCooldownBars(), config.isAllowShortPositions(),
+                config.getMaxTradesPerWeek());
         PerformanceMetrics m = result.getMetrics();
         if (m.getTradeCount() < 1) return NO_TRADE_PENALTY;
 
@@ -187,7 +188,8 @@ public class FitnessEvaluator {
                 config.getInitialCapital(), config.getCommissionRate(),
                 config.getMaxPositionRatio(), config.getStopLossRatio(), config.getMaxHoldingBars(),
                 config.getMinHoldingBars(), config.getMaxDrawdownLimit(), config.getTrendFilterBars(),
-                config.getDrawdownCooldownBars(), config.isAllowShortPositions());
+                config.getDrawdownCooldownBars(), config.isAllowShortPositions(),
+                config.getMaxTradesPerWeek());
         PerformanceMetrics m = result.getMetrics();
         if (m.getTradeCount() < 1) return NO_TRADE_OBJECTIVES;
         // 累计收益软饱和：50%→0.5、100%→0.67、200%→0.8，直接奖励绝对收益（提高收益目标）。

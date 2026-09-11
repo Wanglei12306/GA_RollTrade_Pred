@@ -262,7 +262,7 @@ public class RollingWindowService {
                 config.getInitialCapital(), config.getCommissionRate(), config.getMaxPositionRatio(),
                 config.getStopLossRatio(), config.getMaxHoldingBars(), config.getMinHoldingBars(),
                 config.getMaxDrawdownLimit(), config.getTrendFilterBars(), config.getDrawdownCooldownBars(),
-                config.isAllowShortPositions());
+                config.isAllowShortPositions(), config.getMaxTradesPerWeek());
         return result.getMetrics();
     }
 

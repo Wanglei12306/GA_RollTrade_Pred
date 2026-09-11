@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,33 @@ public class ApiController {
             return badRequest(e.getMessage());
         } catch (IOException e) {
             return badRequest("示例数据加载失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 按服务器本地文件路径加载 CSV：绕过浏览器上传的体积限制，
+     * 适用于 1min 等数 GB 的大数据文件。直接读取服务器磁盘上的文件。
+     */
+    @PostMapping("/api/load-path")
+    public ResponseEntity<?> loadByPath(@RequestParam String path) {
+        if (path == null || path.isBlank()) {
+            return badRequest("请填写 CSV 文件路径");
+        }
+        Path file = Path.of(path.trim());
+        if (!Files.isRegularFile(file)) {
+            return badRequest("文件不存在：" + file);
+        }
+        if (!file.getFileName().toString().toLowerCase().endsWith(".csv")) {
+            return badRequest("仅支持 CSV 格式文件");
+        }
+        try (InputStream in = Files.newInputStream(file)) {
+            var klines = csvLoader.load(in);
+            dataService.store(klines, file.getFileName().toString());
+            return ResponseEntity.ok(dataService.preview());
+        } catch (DataValidationException e) {
+            return badRequest(e.getMessage());
+        } catch (IOException e) {
+            return badRequest("文件读取失败：" + e.getMessage());
         }
     }
 

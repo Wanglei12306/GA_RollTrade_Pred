@@ -39,6 +39,7 @@ public class StrategyConfig {
     private double maxDrawdownLimit = 0.25;   // 从净值峰值回撤达到该比例时触发风险预算平仓
     private int drawdownCooldownBars = 30;    // 回撤风控后的冷却期；0 表示永久禁止重新开仓
     private int trendFilterBars = 120;        // 长期均线趋势过滤；弱势阶段保持空仓
+    private int maxTradesPerWeek = 0;         // 每周最多开仓次数；0 表示不限制
     private boolean allowShortPositions = true; // 允许 SELL 开空、BUY 平空；与论文多空语义一致
 
     // —— 择时模型训练参数（当前版本唯一训练目标：择时）——
@@ -136,6 +137,9 @@ public class StrategyConfig {
 
     public int getTrendFilterBars() { return trendFilterBars; }
     public void setTrendFilterBars(int trendFilterBars) { this.trendFilterBars = trendFilterBars; }
+
+    public int getMaxTradesPerWeek() { return maxTradesPerWeek; }
+    public void setMaxTradesPerWeek(int maxTradesPerWeek) { this.maxTradesPerWeek = maxTradesPerWeek; }
 
     public boolean isAllowShortPositions() { return allowShortPositions; }
     public void setAllowShortPositions(boolean allowShortPositions) { this.allowShortPositions = allowShortPositions; }

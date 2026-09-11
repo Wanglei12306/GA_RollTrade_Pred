@@ -42,7 +42,12 @@
           <button class="primary-button" id="uploadBtn">上传 CSV</button>
           <button class="secondary-button" id="sampleBtn">加载示例数据</button>
         </div>
-        <p class="hint">CSV 字段需包含：date, open, high, low, close, volume（字段名支持中英文别名，时间支持多种格式）</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px">
+          <input type="text" id="pathInput" placeholder="或填写服务器上 CSV 文件的路径，如 D:\data\BTC_full_15m.csv"
+                 style="flex:1;min-width:260px;padding:8px 12px">
+          <button class="secondary-button" id="pathBtn">按路径加载</button>
+        </div>
+        <p class="hint">CSV 字段需包含：date, open, high, low, close, volume（字段名支持中英文别名，时间支持多种格式）。大数据文件（如 1min、多 GB）建议使用「按路径加载」，直接读取服务器磁盘文件，绕过浏览器上传体积限制。</p>
       </div>
     </section>
 

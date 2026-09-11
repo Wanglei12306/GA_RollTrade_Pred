@@ -59,8 +59,21 @@ async function loadSample() {
   } catch (e) { showAlert("加载失败：" + e.message, "error"); }
 }
 
+async function loadByPath() {
+  const path = document.getElementById("pathInput").value.trim();
+  if (!path) { showAlert("请填写 CSV 文件路径", "error"); return; }
+  try {
+    const res = await fetch("/api/load-path?path=" + encodeURIComponent(path), { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) { showAlert(data.error || "加载失败", "error"); return; }
+    showAlert("加载成功，共 " + data.rowCount + " 行数据", "success");
+    renderPreview(data);
+  } catch (e) { showAlert("加载失败：" + e.message, "error"); }
+}
+
 document.getElementById("uploadBtn").addEventListener("click", postUpload);
 document.getElementById("sampleBtn").addEventListener("click", loadSample);
+document.getElementById("pathBtn").addEventListener("click", loadByPath);
 
 (async function init() {
   try {

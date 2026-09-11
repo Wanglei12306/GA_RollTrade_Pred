@@ -95,6 +95,7 @@
           <div><label>最大回撤风险预算</label><input type="number" step="0.01" name="maxDrawdownLimit" th:value="${config.maxDrawdownLimit}" min="0" max="1"></div>
           <div><label>回撤冷却根数</label><input type="number" name="drawdownCooldownBars" th:value="${config.drawdownCooldownBars}" min="0" max="1000"></div>
           <div><label>长期趋势过滤根数</label><input type="number" name="trendFilterBars" th:value="${config.trendFilterBars}" min="0" max="2000"></div>
+          <div><label>每周最多开仓次数（0=不限）</label><input type="number" name="maxTradesPerWeek" th:value="${config.maxTradesPerWeek}" min="0" max="1000"></div>
           <div><label>允许做空</label><input type="checkbox" name="allowShortPositions" th:checked="${config.allowShortPositions}"></div>
         </div>
       </section>
@@ -126,6 +127,7 @@
             <div><label>最大回撤风险预算</label><input type="number" step="0.01" name="maxDrawdownLimit" th:value="${config.maxDrawdownLimit}" min="0" max="1"></div>
             <div><label>回撤冷却根数</label><input type="number" name="drawdownCooldownBars" th:value="${config.drawdownCooldownBars}" min="0" max="1000"></div>
           <div><label>长期趋势过滤根数</label><input type="number" name="trendFilterBars" th:value="${config.trendFilterBars}" min="0" max="2000"></div>
+          <div><label>每周最多开仓次数（0=不限）</label><input type="number" name="maxTradesPerWeek" th:value="${config.maxTradesPerWeek}" min="0" max="1000"></div>
           <div><label>允许做空</label><input type="checkbox" name="allowShortPositions" th:checked="${config.allowShortPositions}"></div>
           </div>
           <p class="hint">不重新训练，直接用选定模型对当前数据生成信号并回测。指标取自模型本身，与训练时一致。</p>

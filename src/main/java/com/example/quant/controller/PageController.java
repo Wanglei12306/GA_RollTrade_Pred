@@ -83,6 +83,7 @@ public class PageController {
                                 @RequestParam(defaultValue = "0.25") double maxDrawdownLimit,
                                 @RequestParam(defaultValue = "30") int drawdownCooldownBars,
                                 @RequestParam(defaultValue = "120") int trendFilterBars,
+                                @RequestParam(defaultValue = "0") int maxTradesPerWeek,
                                 RedirectAttributes attrs) {
         try {
             if (!dataService.hasData()) {
@@ -103,6 +104,7 @@ public class PageController {
             cfg.setMaxDrawdownLimit(maxDrawdownLimit);
             cfg.setDrawdownCooldownBars(drawdownCooldownBars);
             cfg.setTrendFilterBars(trendFilterBars);
+            cfg.setMaxTradesPerWeek(maxTradesPerWeek);
             analysisService.backtestWithModel(modelId, cfg);
             return "redirect:/result";
         } catch (Exception e) {

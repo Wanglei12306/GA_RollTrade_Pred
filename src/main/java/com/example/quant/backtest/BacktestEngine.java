@@ -39,7 +39,7 @@ public class BacktestEngine {
                               double initialCapital, double commissionRate) {
         // 保留旧接口语义，供已有调用方和单元测试使用；新业务路径使用下方风控重载。
         return run(klines, signals, name, initialCapital, commissionRate,
-                1.0, 0.0, 0, 0, 0.0, 0, 0, false, false, 0);
+                1.0, 0.0, 0, 0, 0.0, 0, 0, false, false, 0, 0);
     }
 
     /**
@@ -51,7 +51,7 @@ public class BacktestEngine {
                               double maxPositionRatio, double stopLossRatio,
                               int maxHoldingBars) {
         return run(klines, signals, name, initialCapital, commissionRate,
-                maxPositionRatio, stopLossRatio, maxHoldingBars, 0, 0.0, 0, 0, false, true, 1);
+                maxPositionRatio, stopLossRatio, maxHoldingBars, 0, 0.0, 0, 0, false, true, 1, 0);
     }
 
     /** 带最短持仓限制的风控回测；止损和最长持仓不受最短持仓限制。 */
@@ -60,7 +60,7 @@ public class BacktestEngine {
                               double maxPositionRatio, double stopLossRatio,
                               int maxHoldingBars, int minHoldingBars) {
         return run(klines, signals, name, initialCapital, commissionRate,
-                maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars, 0.0, 0, 0, false, true, 1);
+                maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars, 0.0, 0, 0, false, true, 1, 0);
     }
 
     /** 带最大回撤风险预算的回测；达到峰值回撤阈值时强制降低风险敞口。 */
@@ -71,7 +71,7 @@ public class BacktestEngine {
                               double maxDrawdownLimit) {
         return run(klines, signals, name, initialCapital, commissionRate,
                 maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars,
-                maxDrawdownLimit, 0, 0, false, true, 1);
+                maxDrawdownLimit, 0, 0, false, true, 1, 0);
     }
 
     /** 带长期趋势过滤的回测；收盘价低于长期均线时禁止新增长仓。 */
@@ -82,7 +82,7 @@ public class BacktestEngine {
                               double maxDrawdownLimit, int trendFilterBars) {
         return run(klines, signals, name, initialCapital, commissionRate,
                 maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars,
-                maxDrawdownLimit, trendFilterBars, 0, false, true, 1);
+                maxDrawdownLimit, trendFilterBars, 0, false, true, 1, 0);
     }
 
     /**
@@ -98,7 +98,7 @@ public class BacktestEngine {
                               int drawdownCooldownBars) {
         return run(klines, signals, name, initialCapital, commissionRate,
                 maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars,
-                maxDrawdownLimit, trendFilterBars, drawdownCooldownBars, false, true, 1);
+                maxDrawdownLimit, trendFilterBars, drawdownCooldownBars, false, true, 1, 0);
     }
 
     /** 多空回测：BUY 开多/平空，SELL 平多/开空。原有重载保持仅做多兼容语义。 */
@@ -111,7 +111,21 @@ public class BacktestEngine {
         return run(klines, signals, name, initialCapital, commissionRate,
                 maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars,
                 maxDrawdownLimit, trendFilterBars, drawdownCooldownBars,
-                allowShortPositions, true, 1);
+                allowShortPositions, true, 1, 0);
+    }
+
+    /** 带每周开仓次数上限的回测：{@code maxTradesPerWeek} 限制每个自然周最多开几次新仓，0 表示不限制。 */
+    public BacktestResult run(List<KLine> klines, Signal[] signals, String name,
+                              double initialCapital, double commissionRate,
+                              double maxPositionRatio, double stopLossRatio,
+                              int maxHoldingBars, int minHoldingBars,
+                              double maxDrawdownLimit, int trendFilterBars,
+                              int drawdownCooldownBars, boolean allowShortPositions,
+                              int maxTradesPerWeek) {
+        return run(klines, signals, name, initialCapital, commissionRate,
+                maxPositionRatio, stopLossRatio, maxHoldingBars, minHoldingBars,
+                maxDrawdownLimit, trendFilterBars, drawdownCooldownBars,
+                allowShortPositions, true, 1, maxTradesPerWeek);
     }
 
     private BacktestResult run(List<KLine> klines, Signal[] signals, String name,
@@ -122,7 +136,8 @@ public class BacktestEngine {
                                int drawdownCooldownBars,
                                boolean allowShortPositions,
                                boolean forceCloseAtEnd,
-                               int executionLagBars) {
+                               int executionLagBars,
+                               int maxTradesPerWeek) {
         int n = klines.size();
         if (n == 0) {
             return new BacktestResult(name,
@@ -136,6 +151,9 @@ public class BacktestEngine {
         int trendBars = Math.max(0, trendFilterBars);
         double feeRate = clamp(commissionRate, 0.0, 1.0);
         int minHold = Math.max(0, minHoldingBars);
+        int weeklyTradeCap = Math.max(0, maxTradesPerWeek);
+        int tradesThisWeek = 0;
+        long currentWeekKey = Long.MIN_VALUE;
         double cash = initialCapital;
         double shares = 0;
         double entryPrice = 0;
@@ -157,6 +175,14 @@ public class BacktestEngine {
             KLine bar = klines.get(i);
             double price = bar.getClose();
             closes[i] = price;
+            // 每周开仓次数上限：按自然周（周一起算）重置计数。
+            if (weeklyTradeCap > 0 && bar.getDate() != null) {
+                long weekKey = Math.floorDiv(bar.getDate().toEpochDay() - 4L, 7L);
+                if (weekKey != currentWeekKey) {
+                    currentWeekKey = weekKey;
+                    tradesThisWeek = 0;
+                }
+            }
             // 冷却结束后允许重新交易，并从当前现金净值重新计算本轮风险预算。
             if (drawdownHalted && shares == 0 && cooldownRemaining > 0) {
                 cooldownRemaining--;
@@ -197,6 +223,7 @@ public class BacktestEngine {
             if (shares == 0 && !drawdownHalted
                     // 多头要求站上长期均线且斜率不为负；空头使用相反条件，
                     // 让长期下跌标的也能通过做空获得正期望收益。
+                    && (weeklyTradeCap <= 0 || tradesThisWeek < weeklyTradeCap)
                     && ((sig == Signal.BUY && trendAllowsBuy(klines, i, trendBars, true))
                     || (allowShortPositions && sig == Signal.SELL && trendAllowsShort(klines, i, trendBars)))
                     && cash > 0 && positionRatio > 0) {
@@ -217,6 +244,7 @@ public class BacktestEngine {
                 entryPrice = tradePrice;
                 entryCommission = commission;
                 entryBar = i;
+                tradesThisWeek++;
                 if (sig == Signal.BUY) {
                     cash -= notional;
                     trades.add(new TradeRecord(bar.getDate(), "BUY", tradePrice, shares, commission, 0, shares));
